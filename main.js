@@ -52,9 +52,15 @@ function saveConfig(changes) {
 }
 
 // The window can only load the video through a file:// URL.
+// If the saved file has gone, look for a video of the same name in the library.
 function withUrl(background) {
-  if (!background?.path || !fs.existsSync(background.path)) return { ...background, path: null, url: null };
-  return { ...background, url: pathToFileURL(background.path).href };
+  let file = background?.path;
+  if (file && !fs.existsSync(file)) {
+    const inLibrary = path.join(libraryDir(), path.basename(file));
+    file = fs.existsSync(inLibrary) ? inLibrary : null;
+  }
+  if (!file) return { ...background, path: null, url: null };
+  return { ...background, path: file, url: pathToFileURL(file).href };
 }
 
 // Find claude on PATH so node-pty gets a full path to launch. Also look where
@@ -193,11 +199,10 @@ ipcMain.handle('background:save', (_e, background) => {
 });
 
 // Imported backgrounds are copied into this folder, so they keep working even
-// if the original file is moved or deleted. The installed app can't write to
-// its own folder, so it keeps them with the saved settings instead.
+// if the original file is moved or deleted. They sit with the saved settings,
+// so the installed app and the copy run from the code share one library.
 const VIDEO_TYPES = ['mp4', 'webm', 'm4v', 'ogv', 'mov'];
-const libraryDir = () =>
-  app.isPackaged ? path.join(app.getPath('userData'), 'backgrounds') : path.join(__dirname, 'backgrounds');
+const libraryDir = () => path.join(app.getPath('userData'), 'backgrounds');
 
 function listLibrary() {
   fs.mkdirSync(libraryDir(), { recursive: true });
