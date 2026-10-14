@@ -16,7 +16,7 @@ Get **Nova-Grid-Setup-<version>.exe** from the [latest release](https://github.c
 
 Needs [Claude Code](https://claude.com/claude-code). If it isn't installed, Nova Grid shows how to install it; the first terminal you open asks you to sign in. Node.js isn't needed.
 
-From 1.1.0 on, Nova Grid updates itself: it checks GitHub when it opens, downloads a new version in the background, and installs it when you close it (or click **Restart to update**). Click the Nova Grid name in the top bar to see your version or check by hand. Version 1.0.0 has no updater, so download 1.1.0 once by hand.
+From 1.1.0 on, Nova Grid updates itself: it checks GitHub when it opens, downloads a new version in the background, and installs it when you close it (or click **Restart to update**). Click the Nova Grid name in the top bar to see your version or check by hand. Version 1.0.0 has no updater, so download the latest version once by hand.
 
 ## Run it from the source
 
@@ -39,10 +39,10 @@ This makes `dist/Nova-Grid-Setup-<version>.exe`. Double-click it and Nova Grid i
 
 ## Publish a new version
 
-1. Raise `version` in `package.json` (for example 1.1.0 → 1.2.0).
+1. Raise `version` in `package.json` (for example 1.2.0 → 1.3.0).
 2. Run `npm run dist`.
 3. Make a GitHub release with **all three** files from `dist`, so installed copies can update:
 
 ```
-gh release create v1.2.0 dist/Nova-Grid-Setup-1.2.0.exe dist/Nova-Grid-Setup-1.2.0.exe.blockmap dist/latest.yml --title "Nova Grid 1.2.0" --notes "What changed"
+gh release create v1.3.0 dist/Nova-Grid-Setup-1.3.0.exe dist/Nova-Grid-Setup-1.3.0.exe.blockmap dist/latest.yml --title "Nova Grid 1.3.0" --notes "What changed"
 ```
