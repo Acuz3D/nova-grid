@@ -1,0 +1,554 @@
+:root {
+  /* how solid the terminals are; lowered when a background video plays */
+  --pane-alpha: 1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #1a1b1e;
+  color: #d8d8dc;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  background: rgba(34, 35, 39, calc(0.4 + 0.6 * var(--pane-alpha)));
+  position: relative;
+  z-index: 2;
+  border-bottom: 1px solid #2f3036;
+  flex: none;
+}
+
+.brand {
+  font-weight: 600;
+  color: #e8a87c;
+}
+
+#count {
+  color: #8b8c93;
+}
+
+#usage {
+  margin-left: auto;
+  display: flex;
+  gap: 18px;
+}
+
+.limit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  cursor: default;
+}
+
+.limit-name {
+  color: #8b8c93;
+}
+
+.bar {
+  width: 70px;
+  height: 6px;
+  background: #2f3036;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  background: #7cb98a;
+}
+
+.fill.warn {
+  background: #e8c37c;
+}
+
+.fill.high {
+  background: #e57373;
+}
+
+.limit-pct {
+  min-width: 28px;
+}
+
+.limit-reset {
+  color: #6b6c73;
+  font-size: 11px;
+}
+
+button {
+  background: #2d2e34;
+  color: #d8d8dc;
+  border: 1px solid #3a3b42;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #383940;
+}
+
+#grid {
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  padding: 4px;
+  min-height: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: rgba(20, 21, 24, var(--pane-alpha));
+  border: 1px solid #2f3036;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.pane.focused {
+  border-color: #e8a87c;
+}
+
+.pane.hidden {
+  display: none;
+}
+
+.pane-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px 3px 8px;
+  background: rgba(34, 35, 39, calc(0.3 + 0.7 * var(--pane-alpha)));
+  border-bottom: 1px solid #2f3036;
+  user-select: none;
+  flex: none;
+}
+
+.pane-num {
+  color: #6b6c73;
+  font-size: 11px;
+}
+
+.pane-title {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pane-path {
+  color: #6b6c73;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.pane-status {
+  font-size: 11px;
+  color: #8b8c93;
+}
+
+.pane-status.exited {
+  color: #e57373;
+}
+
+.pane-header button {
+  padding: 1px 7px;
+  font-size: 12px;
+}
+
+.pane-header select {
+  background: #2d2e34;
+  color: #d8d8dc;
+  border: 1px solid #3a3b42;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 12px;
+  padding: 1px 2px;
+  cursor: pointer;
+}
+
+.pane-body {
+  flex: 1;
+  min-height: 0;
+  padding: 4px 0 0 6px;
+}
+
+#empty {
+  position: absolute;
+  inset: 40px 0 0 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #8b8c93;
+}
+
+#empty.show {
+  display: flex;
+  z-index: 1;
+}
+
+#empty button {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+#bg-video {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  display: none;
+}
+
+#bg-video.show {
+  display: block;
+}
+
+#bg-menu {
+  position: relative;
+  display: flex;
+  gap: 4px;
+}
+
+#bg-sound:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#bg-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 300px;
+  padding: 10px;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  background: #222327;
+  border: 1px solid #3a3b42;
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+}
+
+#bg-panel.open {
+  display: flex;
+}
+
+#bg-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #b8b8bd;
+}
+
+#bg-panel input[type='range'] {
+  accent-color: #e8a87c;
+}
+
+.bg-note {
+  margin: 0;
+  font-size: 11px;
+  color: #6b6c73;
+}
+
+/* xterm paints its scroll area opaque even with a transparent theme; the
+   pane behind it supplies the background instead. */
+.pane .xterm .xterm-viewport {
+  background-color: transparent !important;
+}
+
+/* xterm draws its own scrollbar; hide the plain Windows one under it */
+.pane .xterm .xterm-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.bg-row {
+  display: flex;
+  gap: 6px;
+}
+
+.bg-row button {
+  flex: 1;
+}
+
+#bg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.bg-item {
+  display: flex;
+  gap: 3px;
+}
+
+.bg-item .bg-pick {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bg-item.current .bg-pick {
+  border-color: #e8a87c;
+  color: #e8a87c;
+}
+
+.bg-item .bg-delete {
+  padding: 4px 7px;
+  color: #8b8c93;
+}
+
+.bg-item .bg-delete:hover {
+  color: #e57373;
+}
+
+#bg-url {
+  flex: 2;
+  min-width: 0;
+  background: #1a1b1e;
+  color: #d8d8dc;
+  border: 1px solid #3a3b42;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 12px;
+}
+
+#bg-url:focus {
+  outline: none;
+  border-color: #e8a87c;
+}
+
+#bg-status:empty {
+  display: none;
+}
+
+.pane-header .mcp {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #7cb98a;
+  background: transparent;
+  border-color: transparent;
+}
+
+.pane-header .mcp:hover {
+  border-color: #3a3b42;
+}
+
+.pane-header .mcp.warn {
+  color: #e8c37c;
+}
+
+/* Keybinds sheet: covers the grid, toggled with the Keybinds button or F1 */
+#keys-sheet {
+  position: fixed;
+  inset: 41px 0 0 0;
+  display: none;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(10, 10, 12, 0.6);
+  z-index: 20;
+}
+
+#keys-sheet.open {
+  display: flex;
+}
+
+#keys-box {
+  display: flex;
+  flex-direction: column;
+  width: min(1100px, 100%);
+  background: #222327;
+  border: 1px solid #3a3b42;
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  min-height: 0;
+}
+
+#keys-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #2f3036;
+}
+
+.keys-heading {
+  font-weight: 600;
+  font-size: 15px;
+  color: #e8a87c;
+}
+
+#keys-search {
+  flex: 1;
+  background: #1a1b1e;
+  color: #d8d8dc;
+  border: 1px solid #3a3b42;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font: inherit;
+}
+
+#keys-search:focus {
+  outline: none;
+  border-color: #e8a87c;
+}
+
+#keys-list {
+  overflow-y: auto;
+  padding: 4px 16px 16px;
+}
+
+/* inside the scrolling list, so the columns grow downwards, not sideways */
+.keys-cols {
+  columns: 2 440px;
+  column-gap: 28px;
+}
+
+.keys-group {
+  break-inside: avoid;
+  padding-top: 12px;
+}
+
+.keys-group h3 {
+  margin: 0 0 2px;
+  font-size: 13px;
+  color: #e8a87c;
+}
+
+.keys-group .keys-about {
+  margin: 0 0 6px;
+  font-size: 11px;
+  color: #6b6c73;
+}
+
+.keys-row {
+  display: flex;
+  gap: 12px;
+  padding: 3px 0;
+  border-bottom: 1px solid #2a2b30;
+}
+
+.keys-combo {
+  flex: none;
+  width: 190px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+}
+
+kbd {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 11px;
+  padding: 1px 5px;
+  background: #2d2e34;
+  border: 1px solid #44454d;
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.keys-what {
+  color: #b8b8bd;
+}
+
+.keys-what .keys-note {
+  display: block;
+  font-size: 11px;
+  color: #8b8c93;
+}
+
+.keys-none {
+  color: #6b6c73;
+  padding-top: 16px;
+}
+
+#bg-panel label.bg-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.bg-check input {
+  margin: 0;
+  accent-color: #e8a87c;
+}
+
+.brand-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: -6px;
+}
+
+#app-btns {
+  display: flex;
+  gap: 4px;
+}
+
+/* the pulled-in program covers this; the message shows while it isn't there */
+.app-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.app-msg {
+  margin: 0;
+  padding: 0 20px;
+  color: #8b8c93;
+  text-align: center;
+}
+
+/* keep the crowded top bar on one line */
+#toolbar button,
+.brand,
+#count,
+.limit,
+.limit-reset {
+  white-space: nowrap;
+}
+
+#usage {
+  min-width: 0;
+  overflow: hidden;
+}

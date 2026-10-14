@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' file:" />
+  <title>Nova Grid</title>
+  <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <video id="bg-video" muted autoplay playsinline></video>
+
+  <header id="toolbar">
+    <img class="brand-icon" src="../icon.png" alt="" />
+    <span class="brand">Nova Grid</span>
+    <button id="add-btn" title="Open a new Claude terminal in a folder (Ctrl+Shift+T)">+ Add terminal</button>
+    <div id="app-btns" title="Pull this program's window into a pane (it opens it if needed)">
+      <button data-app="chatgpt">ChatGPT</button>
+      <button data-app="obsidian">Obsidian</button>
+    </div>
+    <div id="bg-menu">
+      <button id="bg-btn" title="Play a video behind the terminals">Background</button>
+      <button id="bg-sound" title="Turn the background video's sound on or off"></button>
+      <div id="bg-panel">
+        <div class="bg-row">
+          <button id="bg-import" title="Copy videos into the app's backgrounds folder">Import video…</button>
+          <button id="bg-remove">No background</button>
+        </div>
+        <div class="bg-row">
+          <input id="bg-url" type="text" placeholder="Paste a YouTube or Pinterest link" spellcheck="false" />
+          <button id="bg-add-link" title="Download this video into your backgrounds">Add</button>
+        </div>
+        <p id="bg-status" class="bg-note"></p>
+        <div id="bg-list"></div>
+        <label class="bg-check">
+          <input id="bg-auto-next" type="checkbox" />
+          Play the next video when this one ends
+        </label>
+        <label>
+          Sound volume <span id="bg-volume-value"></span>
+          <input id="bg-volume" type="range" min="0" max="100" step="5" />
+        </label>
+        <label>
+          Terminal opacity <span id="bg-opacity-value"></span>
+          <input id="bg-opacity" type="range" min="20" max="100" step="5" />
+        </label>
+        <p class="bg-note">Lower lets more of the video show through the terminals.</p>
+        <label>
+          Play from <span id="bg-start-value"></span>
+          <input id="bg-start" type="range" min="0" step="0.5" />
+        </label>
+        <label>
+          Play until <span id="bg-end-value"></span>
+          <input id="bg-end" type="range" min="0" step="0.5" />
+        </label>
+        <p class="bg-note">Loops just this part of the video. <span id="bg-length"></span></p>
+      </div>
+    </div>
+    <span id="count"></span>
+    <div id="usage"></div>
+    <button id="keys-btn" title="Show all of Claude's keybinds (F1)&#10;&#10;Nova Grid's own keys:&#10;F1 show or hide Claude's keybinds&#10;Ctrl+Shift+T new terminal&#10;Ctrl+Shift+W close the selected pane&#10;Ctrl+1–9 jump to a pane&#10;Ctrl+Shift+Enter or double-click a title to enlarge&#10;Ctrl+C copy selected text · Ctrl+V paste text">Keybinds</button>
+  </header>
+
+  <div id="keys-sheet">
+    <div id="keys-box">
+      <div id="keys-top">
+        <span class="keys-heading">Claude keybinds</span>
+        <input id="keys-search" type="text" placeholder="Search, e.g. paste, history, ctrl+r" spellcheck="false" />
+        <button id="keys-close" title="Close (Esc or F1)">✕</button>
+      </div>
+      <div id="keys-list"></div>
+    </div>
+  </div>
+
+  <main id="grid"></main>
+
+  <div id="empty">
+    <p>No terminals open yet.</p>
+    <button id="empty-add-btn">+ Pick a folder to start Claude in</button>
+  </div>
+
+  <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="keybinds.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
