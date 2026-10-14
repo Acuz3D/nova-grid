@@ -3,6 +3,10 @@
 // window is made a child of Nova Grid's window, which mostly works but can
 // glitch. Windows are always handed back before Nova Grid closes, because
 // Windows destroys a child window along with its parent.
+// A faded (see-through) program can't be a child window: these programs draw
+// with the graphics card, and a faded child window comes out blank. So while
+// faded, the window floats on top of Nova Grid instead, borderless and kept
+// over its pane, and goes back inside when made solid again.
 const koffi = require('koffi');
 const path = require('path');
 const { execFile, spawn } = require('child_process');
@@ -37,6 +41,8 @@ const w = {
   SetWindowPos: user32.func('bool __stdcall SetWindowPos(intptr_t hwnd, intptr_t after, int x, int y, int cx, int cy, uint32 flags)'),
   ShowWindow: user32.func('bool __stdcall ShowWindow(intptr_t hwnd, int cmd)'),
   SetFocus: user32.func('intptr_t __stdcall SetFocus(intptr_t hwnd)'),
+  SetForegroundWindow: user32.func('bool __stdcall SetForegroundWindow(intptr_t hwnd)'),
+  ClientToScreen: user32.func('bool __stdcall ClientToScreen(intptr_t hwnd, _Inout_ POINT *pt)'),
   SetLayeredWindowAttributes: user32.func('bool __stdcall SetLayeredWindowAttributes(intptr_t hwnd, uint32 key, uint8 alpha, uint32 flags)'),
   OpenProcess: kernel32.func('intptr_t __stdcall OpenProcess(uint32 access, bool inherit, uint32 pid)'),
   QueryFullProcessImageNameW: kernel32.func('bool __stdcall QueryFullProcessImageNameW(intptr_t proc, uint32 flags, uint8 *buf, _Inout_ uint32 *size)'),
@@ -45,6 +51,7 @@ const w = {
 
 const GWL_STYLE = -16;
 const GWL_EXSTYLE = -20;
+const GWLP_HWNDPARENT = -8; // on a top-level window: its owner
 const GW_OWNER = 4;
 const WS_CHILD = 0x40000000;
 const WS_POPUP = 0x80000000 | 0;
@@ -57,6 +64,8 @@ const SWP_NOACTIVATE = 0x10;
 const SWP_FRAMECHANGED = 0x20;
 const SWP_SHOWWINDOW = 0x40;
 const SWP_NOZORDER = 0x4;
+const SWP_NOSIZE = 0x1;
+const SWP_NOMOVE = 0x2;
 const SW_HIDE = 0;
 const SW_SHOWNA = 8;
 const SW_RESTORE = 9;
@@ -73,7 +82,7 @@ const APPS = {
   edge: { name: 'Microsoft Edge', exe: 'msedge.exe', startName: /^Microsoft Edge$/, multiWindow: true },
 };
 
-const embedded = new Map(); // pane id -> { hwnd, style, exStyle, rect, shown }
+const embedded = new Map(); // pane id -> { hwnd, parent, style, exStyle, rect, at, shown, floating, opacity }
 
 function title(hwnd) {
   const buf = Buffer.alloc(1024);
@@ -186,8 +195,20 @@ async function attachNow(id, appKey, parentHwnd, onStatus) {
     w.ShowWindow(hwnd, SW_SHOW);
     return { error: `Windows wouldn't let ${app.name} be moved inside` };
   }
-  embedded.set(id, { hwnd, exe: app.exe, style, exStyle, rect, shown: false });
+  embedded.set(id, { hwnd, parent: parentHwnd, exe: app.exe, style, exStyle, rect, shown: false, floating: false });
   return { title: title(hwnd) };
+}
+
+// Put the window where the pane last said, inside Nova Grid's content area
+// (or over it on screen, while floating).
+function move(e) {
+  const r = e.at;
+  const pt = { x: r.x, y: r.y };
+  if (e.floating) w.ClientToScreen(e.parent, pt);
+  // A floating window keeps its place in front of Nova Grid without help.
+  const flags = SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW | (e.floating ? SWP_NOZORDER : 0);
+  w.SetWindowPos(e.hwnd, 0, pt.x, pt.y, r.width, r.height, flags);
+  e.shown = true;
 }
 
 // rect is in the window's own pixels, relative to its content area.
@@ -199,8 +220,33 @@ function place(id, rect, visible) {
     e.shown = false;
     return;
   }
-  w.SetWindowPos(e.hwnd, 0, rect.x, rect.y, rect.width, rect.height, SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
-  e.shown = true;
+  e.at = rect;
+  move(e);
+}
+
+// Floating windows don't move with Nova Grid on their own, so they're moved
+// along whenever it is.
+function follow() {
+  for (const e of embedded.values()) if (e.floating && e.shown) move(e);
+}
+
+// Inside the pane as a child window, or floating over it (see the top).
+function setFloating(e, floating) {
+  if (e.floating === floating) return;
+  e.floating = floating;
+  const style = e.style & ~(WS_FRAME | WS_POPUP | WS_CHILD);
+  if (floating) {
+    w.SetParent(e.hwnd, 0);
+    w.SetWindowLongPtrW(e.hwnd, GWL_STYLE, style | WS_POPUP);
+    // Owned by Nova Grid: always in front of it, minimised and hidden with it.
+    w.SetWindowLongPtrW(e.hwnd, GWLP_HWNDPARENT, e.parent);
+    w.SetWindowPos(e.hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+  } else {
+    w.SetWindowLongPtrW(e.hwnd, GWLP_HWNDPARENT, 0);
+    w.SetWindowLongPtrW(e.hwnd, GWL_STYLE, style | WS_CHILD);
+    w.SetParent(e.hwnd, e.parent);
+  }
+  if (e.shown) move(e);
 }
 
 // See-through: the whole window (text too) is faded so the background video
@@ -212,15 +258,19 @@ function opacity(id, percent) {
   const exStyle = Number(w.GetWindowLongPtrW(e.hwnd, GWL_EXSTYLE)) | 0;
   if (percent >= 100) {
     w.SetWindowLongPtrW(e.hwnd, GWL_EXSTYLE, exStyle & ~WS_EX_LAYERED);
+    setFloating(e, false);
     return;
   }
+  setFloating(e, true);
   w.SetWindowLongPtrW(e.hwnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
   w.SetLayeredWindowAttributes(e.hwnd, 0, Math.round((percent / 100) * 255), LWA_ALPHA);
 }
 
 function focus(id) {
   const e = embedded.get(id);
-  if (e) w.SetFocus(e.hwnd);
+  if (!e) return;
+  if (e.floating) w.SetForegroundWindow(e.hwnd);
+  else w.SetFocus(e.hwnd);
 }
 
 // Give the window back as it was: own frame, own taskbar button, old position.
@@ -231,6 +281,7 @@ function release(id) {
   if (!w.IsWindow(e.hwnd)) return;
   w.ShowWindow(e.hwnd, SW_HIDE);
   w.SetParent(e.hwnd, 0);
+  w.SetWindowLongPtrW(e.hwnd, GWLP_HWNDPARENT, 0);
   w.SetWindowLongPtrW(e.hwnd, GWL_STYLE, e.style);
   w.SetWindowLongPtrW(e.hwnd, GWL_EXSTYLE, e.exStyle);
   const r = e.rect;
@@ -257,4 +308,4 @@ function check() {
   return { gone, titles };
 }
 
-module.exports = { APPS, attach, place, opacity, focus, release, releaseAll, check };
+module.exports = { APPS, attach, place, follow, opacity, focus, release, releaseAll, check };

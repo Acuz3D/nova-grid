@@ -150,6 +150,10 @@ function createWindow() {
   // Hand back any pulled-in programs before the window goes, or Windows
   // would close them along with it.
   win.on('close', embed.releaseAll);
+  // Faded programs float over the window rather than inside it, so they're
+  // moved along with it.
+  win.on('move', embed.follow);
+  win.on('resize', embed.follow);
   win.on('maximize', () => send('win:maximized', true));
   win.on('unmaximize', () => send('win:maximized', false));
 }

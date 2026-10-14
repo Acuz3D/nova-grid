@@ -766,8 +766,8 @@ document.getElementById('keys-close').addEventListener('click', () => toggleKeys
 // Programs pulled in from outside sit on top of everything in the window, so
 // they're hidden while a menu or the commands sheet is open.
 const APP_NAMES = { chatgpt: 'ChatGPT', obsidian: 'Obsidian', edge: 'Microsoft Edge' };
-// faded by the "ChatGPT and Obsidian opacity" slider while a background plays
-const SEE_THROUGH_APPS = ['chatgpt', 'obsidian'];
+// faded by the "ChatGPT, Obsidian and Edge opacity" slider while a background plays
+const SEE_THROUGH_APPS = ['chatgpt', 'obsidian', 'edge'];
 
 function createAppPane(app) {
   const id = `pane-${nextId++}`;

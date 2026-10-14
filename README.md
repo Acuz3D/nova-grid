@@ -5,7 +5,7 @@ A Windows app that runs several Claude Code terminals side by side in one window
 - Pick a model and effort level per terminal
 - Usage bars for the session, weekly and Fable limits
 - MCP servers shown per folder
-- ChatGPT, Obsidian and Microsoft Edge (the desktop apps) pulled into panes alongside the terminals; ChatGPT and Obsidian can be faded so the background shows through
+- ChatGPT, Obsidian and Microsoft Edge (the desktop apps) pulled into panes alongside the terminals; all three can be faded so the background shows through
 - Layouts: grid, side by side, stacked, or one big pane with the rest beside or below it; move panes around from the Layout menu
 - Video backgrounds (import a file or paste a YouTube link), with looping, volume and auto-play of the next video
 - A Commands sheet (F1) listing all of Claude's / commands; click one to type it into the selected terminal
