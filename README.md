@@ -9,7 +9,13 @@ A Windows app that runs several Claude Code terminals side by side in one window
 - Video backgrounds (import a file or paste a YouTube link), with looping, volume and auto-play of the next video
 - A Commands sheet (F1) listing all of Claude's / commands; click one to type it into the selected terminal
 
-## Run it
+## Download
+
+Get **Nova-Grid-Setup-1.0.0.exe** from the [latest release](https://github.com/Acuz3D/nova-grid/releases/latest) and double-click it. Nova Grid installs and opens, with Start menu and desktop shortcuts. If Windows says "Windows protected your PC" (the app isn't signed), click **More info**, then **Run anyway**.
+
+Needs [Claude Code](https://claude.com/claude-code) installed and signed in.
+
+## Run it from the source
 
 You need [Node.js](https://nodejs.org) installed. Download this repository (Code → Download ZIP, or `git clone`), open a terminal in its folder, then:
 
