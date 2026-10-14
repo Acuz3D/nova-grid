@@ -145,9 +145,11 @@ ipcMain.handle('background:save', (_e, background) => {
 });
 
 // Imported backgrounds are copied into this folder, so they keep working even
-// if the original file is moved or deleted.
+// if the original file is moved or deleted. The installed app can't write to
+// its own folder, so it keeps them with the saved settings instead.
 const VIDEO_TYPES = ['mp4', 'webm', 'm4v', 'ogv', 'mov'];
-const libraryDir = () => path.join(__dirname, 'backgrounds');
+const libraryDir = () =>
+  app.isPackaged ? path.join(app.getPath('userData'), 'backgrounds') : path.join(__dirname, 'backgrounds');
 
 function listLibrary() {
   fs.mkdirSync(libraryDir(), { recursive: true });
@@ -285,7 +287,9 @@ const MODELS = ['fable', 'opus', 'sonnet', 'haiku'];
 function paneSettingsFile(id) {
   fs.mkdirSync(usageDir(), { recursive: true });
   const usageFile = fwd(path.join(usageDir(), `${id}.json`));
-  const script = fwd(path.join(__dirname, 'statusline.js'));
+  // Claude runs this with its own node, which can't read inside app.asar, so
+  // the installer keeps a loose copy next to it (see asarUnpack).
+  const script = fwd(path.join(__dirname.replace(/app\.asar$/, 'app.asar.unpacked'), 'statusline.js'));
   const settingsFile = path.join(usageDir(), `${id}.settings.json`);
   const settings = { statusLine: { type: 'command', command: `node "${script}" "${usageFile}"`, padding: 0 } };
   fs.writeFileSync(settingsFile, JSON.stringify(settings));

@@ -2,3 +2,4 @@ node_modules/
 # the background videos are large and not ours to share
 backgrounds/
 *.lnk
+dist/

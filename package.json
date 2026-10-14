@@ -4,11 +4,13 @@
   "description": "Several Claude Code terminals in one window, each in its own folder",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
   },
   "type": "commonjs",
   "devDependencies": {
-    "electron": "^44.7.2"
+    "electron": "^44.7.2",
+    "electron-builder": "^26.15.3"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
@@ -16,5 +18,40 @@
     "koffi": "^3.3.3",
     "node-pty": "^1.1.0"
   },
-  "productName": "Nova Grid"
+  "productName": "Nova Grid",
+  "build": {
+    "appId": "com.acuz3d.novagrid",
+    "productName": "Nova Grid",
+    "directories": {
+      "output": "dist"
+    },
+    "npmRebuild": false,
+    "files": [
+      "**/*",
+      "!backgrounds/**",
+      "!dist/**",
+      "!*.lnk",
+      "!README.md",
+      "!node_modules/node-pty/{deps,third_party,src,scripts,binding.gyp}/**",
+      "!node_modules/node-pty/prebuilds/{darwin-*,win32-arm64}/**",
+      "!node_modules/node-pty/**/*.pdb"
+    ],
+    "asarUnpack": [
+      "statusline.js",
+      "node_modules/node-pty/**",
+      "node_modules/koffi/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Nova Grid"
+    }
+  }
 }
