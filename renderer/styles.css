@@ -3,7 +3,7 @@
 :root {
   /* how solid the terminals are; lowered when a background video plays */
   --pane-alpha: 1;
-  --bar-h: 40px; /* top bar; also the height of the window buttons in main.js */
+  --bar-h: 40px; /* top bar, which is also the window's title bar */
   --bg: #0b0b0c;
   --panel: #141415;
   --line: rgba(255, 255, 255, 0.08);
@@ -154,8 +154,7 @@ input[type='checkbox'] {
   align-items: center;
   gap: 8px;
   height: var(--bar-h);
-  /* room for Windows' minimise / maximise / close on the right */
-  padding: 0 calc(140px + 8px) 0 12px;
+  padding: 0 0 0 12px;
   background: rgba(11, 11, 12, calc(0.45 + 0.55 * var(--pane-alpha)));
   border-bottom: 1px solid var(--line);
   position: relative;
@@ -170,6 +169,34 @@ input[type='checkbox'] {
 #bg-menu,
 #usage {
   -webkit-app-region: no-drag;
+}
+
+/* minimise / maximise / close: full bar height, flush with the right edge */
+#win-btns {
+  display: flex;
+  align-self: stretch;
+  margin-left: 4px;
+  border-left: 1px solid var(--line);
+}
+
+#win-btns button {
+  width: 46px;
+  height: 100%;
+  padding: 0;
+  justify-content: center;
+  border: none;
+  border-radius: 0;
+  color: #bdbdbd;
+}
+
+#win-btns button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+#win-btns #win-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  box-shadow: inset 0 -1px 0 var(--glow);
 }
 
 .brand-icon {

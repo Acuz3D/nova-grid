@@ -106,10 +106,9 @@ function createWindow() {
     height: 950,
     backgroundColor: '#0b0b0c',
     title: 'Nova Grid',
-    // The top bar doubles as the title bar; Windows still draws its own
-    // minimise / maximise / close on the right (height matches --bar-h).
+    // The top bar doubles as the title bar, with its own minimise / maximise /
+    // close drawn in the app's style (Windows' ones sit on a solid colour).
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#0b0b0c', symbolColor: '#cfcfcf', height: 40 },
     icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
@@ -123,7 +122,15 @@ function createWindow() {
   // Hand back any pulled-in programs before the window goes, or Windows
   // would close them along with it.
   win.on('close', embed.releaseAll);
+  win.on('maximize', () => send('win:maximized', true));
+  win.on('unmaximize', () => send('win:maximized', false));
 }
+
+// The top bar's own window buttons.
+ipcMain.on('win:minimize', () => win.minimize());
+ipcMain.on('win:maximize', () => (win.isMaximized() ? win.unmaximize() : win.maximize()));
+ipcMain.on('win:close', () => win.close());
+ipcMain.handle('win:is-maximized', () => win.isMaximized());
 
 // Programs pulled into panes (see embed.js).
 const parentHwnd = () => Number(win.getNativeWindowHandle().readBigUInt64LE(0));

@@ -27,6 +27,10 @@ const ICONS = {
   slash: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M14.5 7.5l-5 9"/>',
   soundOn: '<path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10"/>',
   soundOff: '<path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M16 10l4 4M20 10l-4 4"/>',
+  winMin: '<path d="M6 12h12"/>',
+  winMax: '<rect x="6" y="6" width="12" height="12" rx="1.5"/>',
+  winRestore: '<rect x="5" y="9" width="10" height="10" rx="1.5"/><path d="M9 9V6.5A1.5 1.5 0 0 1 10.5 5h7A1.5 1.5 0 0 1 19 6.5v7a1.5 1.5 0 0 1-1.5 1.5H15"/>',
+  winClose: '<path d="M7 7l10 10M17 7L7 17"/>',
 };
 const icon = (name) => `<svg class="icon" viewBox="0 0 24 24">${ICONS[name]}</svg>`;
 document.querySelectorAll('[data-icon]').forEach((el) => (el.outerHTML = icon(el.dataset.icon)));
@@ -712,6 +716,18 @@ function toggleKeys(open = !keysSheet.classList.contains('open')) {
 
 keysSearch.addEventListener('input', renderKeys);
 document.getElementById('keys-btn').addEventListener('click', () => toggleKeys());
+
+// Minimise / maximise / close, drawn here so they match the rest of the bar.
+const winMax = document.getElementById('win-max');
+function showMaximized(maximized) {
+  winMax.innerHTML = icon(maximized ? 'winRestore' : 'winMax');
+  winMax.title = maximized ? 'Restore' : 'Maximise';
+}
+document.getElementById('win-min').addEventListener('click', () => window.api.minimizeWindow());
+winMax.addEventListener('click', () => window.api.maximizeWindow());
+document.getElementById('win-close').addEventListener('click', () => window.api.closeWindow());
+window.api.onMaximized(showMaximized);
+window.api.isMaximized().then(showMaximized);
 document.getElementById('keys-close').addEventListener('click', () => toggleKeys(false));
 // Programs pulled in from outside sit on top of everything in the window, so
 // they're hidden while a menu or the commands sheet is open.

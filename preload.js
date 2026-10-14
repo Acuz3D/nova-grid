@@ -31,6 +31,12 @@ contextBridge.exposeInMainWorld('api', {
   onAppStatus: (cb) => ipcRenderer.on('app:status', (_e, id, status) => cb(id, status)),
   onAppCheck: (cb) => ipcRenderer.on('app:check', (_e, gone, titles) => cb(gone, titles)),
 
+  minimizeWindow: () => ipcRenderer.send('win:minimize'),
+  maximizeWindow: () => ipcRenderer.send('win:maximize'),
+  closeWindow: () => ipcRenderer.send('win:close'),
+  isMaximized: () => ipcRenderer.invoke('win:is-maximized'),
+  onMaximized: (cb) => ipcRenderer.on('win:maximized', (_e, maximized) => cb(maximized)),
+
   copy: (text) => ipcRenderer.send('clipboard:write', text),
   paste: () => ipcRenderer.invoke('clipboard:read'),
 });
