@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, clipboard, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, clipboard, shell, nativeTheme } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -100,11 +100,16 @@ function send(channel, ...args) {
 }
 
 function createWindow() {
+  nativeTheme.themeSource = 'dark';
   win = new BrowserWindow({
     width: 1600,
     height: 950,
-    backgroundColor: '#1a1b1e',
+    backgroundColor: '#0b0b0c',
     title: 'Nova Grid',
+    // The top bar doubles as the title bar; Windows still draws its own
+    // minimise / maximise / close on the right (height matches --bar-h).
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#0b0b0c', symbolColor: '#cfcfcf', height: 40 },
     icon: path.join(__dirname, 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {

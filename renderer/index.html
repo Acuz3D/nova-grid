@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' file:" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' file:" />
   <title>Nova Grid</title>
   <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css" />
   <link rel="stylesheet" href="styles.css" />
@@ -13,14 +13,15 @@
   <header id="toolbar">
     <img class="brand-icon" src="../icon.png" alt="" />
     <span class="brand">Nova Grid</span>
-    <button id="add-btn" title="Open a new Claude terminal in a folder (Ctrl+Shift+T)">+ Add terminal</button>
-    <div id="app-btns" title="Pull this program's window into a pane (it opens it if needed)">
-      <button data-app="chatgpt">ChatGPT</button>
-      <button data-app="obsidian">Obsidian</button>
+    <button id="add-btn" title="Open a new Claude terminal in a folder (Ctrl+Shift+T)"><i data-icon="plus"></i>Terminal</button>
+    <div id="app-btns">
+      <button data-app="chatgpt" class="icon-btn" title="ChatGPT: pull its window into a pane (it opens it if needed)"><span class="logo logo-chatgpt"></span></button>
+      <button data-app="obsidian" class="icon-btn" title="Obsidian: pull its window into a pane (it opens it if needed)"><span class="logo logo-obsidian"></span></button>
     </div>
+    <span class="sep"></span>
     <div id="bg-menu">
-      <button id="bg-btn" title="Play a video behind the terminals">Background</button>
-      <button id="bg-sound" title="Turn the background video's sound on or off"></button>
+      <button id="bg-btn" class="icon-btn" title="Background video"><i data-icon="image"></i></button>
+      <button id="bg-sound" class="icon-btn" title="Turn the background video's sound on or off"></button>
       <div id="bg-panel">
         <div class="bg-row">
           <button id="bg-import" title="Copy videos into the app's backgrounds folder">Import video…</button>
@@ -58,15 +59,15 @@
     </div>
     <span id="count"></span>
     <div id="usage"></div>
-    <button id="keys-btn" title="Show all of Claude's keybinds (F1)&#10;&#10;Nova Grid's own keys:&#10;F1 show or hide Claude's keybinds&#10;Ctrl+Shift+T new terminal&#10;Ctrl+Shift+W close the selected pane&#10;Ctrl+1–9 jump to a pane&#10;Ctrl+Shift+Enter or double-click a title to enlarge&#10;Ctrl+C copy selected text · Ctrl+V paste text">Keybinds</button>
+    <button id="keys-btn" class="icon-btn" title="Claude's / commands (F1)&#10;&#10;Nova Grid's own keys:&#10;F1 show or hide Claude's commands&#10;Ctrl+Shift+T new terminal&#10;Ctrl+Shift+W close the selected pane&#10;Ctrl+1–9 jump to a pane&#10;Ctrl+Shift+Enter or double-click a title to enlarge&#10;Ctrl+C copy selected text · Ctrl+V paste text"><i data-icon="slash"></i></button>
   </header>
 
   <div id="keys-sheet">
     <div id="keys-box">
       <div id="keys-top">
-        <span class="keys-heading">Claude keybinds</span>
-        <input id="keys-search" type="text" placeholder="Search, e.g. paste, history, ctrl+r" spellcheck="false" />
-        <button id="keys-close" title="Close (Esc or F1)">✕</button>
+        <span class="keys-heading">Commands</span>
+        <input id="keys-search" type="text" placeholder="Search, e.g. compact, model, review" spellcheck="false" />
+        <button id="keys-close" class="icon-btn" title="Close (Esc or F1)"><i data-icon="close"></i></button>
       </div>
       <div id="keys-list"></div>
     </div>
@@ -75,13 +76,14 @@
   <main id="grid"></main>
 
   <div id="empty">
-    <p>No terminals open yet.</p>
-    <button id="empty-add-btn">+ Pick a folder to start Claude in</button>
+    <span class="brand">Nova Grid</span>
+    <p>Nothing open yet.</p>
+    <button id="empty-add-btn"><i data-icon="plus"></i>Pick a folder to start Claude in</button>
   </div>
 
   <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
   <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
-  <script src="keybinds.js"></script>
+  <script src="commands.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

@@ -11,10 +11,25 @@ let enlarged = null;
 // (possibly translucent) background colour so a background video can show.
 const theme = {
   background: 'rgba(0, 0, 0, 0)',
-  foreground: '#d8d8dc',
-  cursor: '#e8a87c',
-  selectionBackground: '#44475a',
+  foreground: '#e4e4e4',
+  cursor: '#f5f5f5',
+  cursorAccent: '#0b0b0c',
+  selectionBackground: 'rgba(255, 255, 255, 0.2)',
 };
+
+// Thin line icons (24×24, drawn with the text colour).
+const ICONS = {
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  restart: '<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/>',
+  enlarge: '<path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/>',
+  image: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 16l5-4.5 4 3.5 3-2.5 6 5"/><circle cx="16" cy="9.5" r="1.3"/>',
+  slash: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M14.5 7.5l-5 9"/>',
+  soundOn: '<path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10"/>',
+  soundOff: '<path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M16 10l4 4M20 10l-4 4"/>',
+};
+const icon = (name) => `<svg class="icon" viewBox="0 0 24 24">${ICONS[name]}</svg>`;
+document.querySelectorAll('[data-icon]').forEach((el) => (el.outerHTML = icon(el.dataset.icon)));
 
 function folderName(cwd) {
   return cwd.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || cwd;
@@ -147,9 +162,9 @@ function createPane(cwd, effort = '', model = '') {
         <option value="xhigh">effort: xhigh</option>
         <option value="max">effort: max</option>
       </select>
-      <button class="restart" title="Restart Claude in this folder">↻</button>
-      <button class="enlarge" title="Enlarge / shrink (Ctrl+Shift+Enter)">⤢</button>
-      <button class="close" title="Close (Ctrl+Shift+W)">✕</button>
+      <button class="restart icon-btn" title="Restart Claude in this folder">${icon('restart')}</button>
+      <button class="enlarge icon-btn" title="Enlarge / shrink (Ctrl+Shift+Enter)">${icon('enlarge')}</button>
+      <button class="close icon-btn" title="Close (Ctrl+Shift+W)">${icon('close')}</button>
     </div>
     <div class="pane-body"></div>`;
   el.querySelector('.pane-title').textContent = folderName(cwd);
@@ -422,7 +437,7 @@ function applyBackground() {
   if (playing) bgVideo.play().catch(() => {});
   else bgVideo.load();
 
-  bgSound.textContent = background.muted ? '🔇' : '🔊';
+  bgSound.innerHTML = icon(background.muted ? 'soundOff' : 'soundOn');
   bgSound.title = background.muted ? 'Sound is off. Click to turn it on' : 'Sound is on. Click to turn it off';
   bgSound.disabled = !playing;
   showLoopSection();
@@ -469,7 +484,7 @@ function renderLibrary() {
   for (const video of library) {
     const row = document.createElement('div');
     row.className = 'bg-item' + (isCurrent(video) ? ' current' : '');
-    row.innerHTML = '<button class="bg-pick"></button><button class="bg-delete" title="Move to the Recycle Bin">✕</button>';
+    row.innerHTML = '<button class="bg-pick"></button><button class="bg-delete" title="Move to the Recycle Bin">' + icon('close') + '</button>';
     row.querySelector('.bg-pick').textContent = video.name;
     row.querySelector('.bg-pick').title = `Play ${video.name}`;
     row.querySelector('.bg-pick').addEventListener('click', () => selectVideo(video.path));
@@ -623,24 +638,27 @@ Promise.all([window.api.loadBackground(), window.api.listLibrary()]).then(([save
   applyBackground();
 });
 
-// Keybinds sheet: every key from keybinds.js, grouped, with a search box.
+// Commands sheet: Claude's / commands from commands.js, grouped, with a
+// search box. Clicking one types it into the selected terminal.
 const keysSheet = document.getElementById('keys-sheet');
 const keysSearch = document.getElementById('keys-search');
 const keysList = document.getElementById('keys-list');
 
-// "Ctrl+R or Esc Esc" -> [Ctrl+R] or [Esc] [Esc]
-function comboEl(combo) {
+// "/model [model]" -> /model in white, its options dimmed
+function commandEl(command) {
+  const [name, ...options] = command.split(' ');
   const el = document.createElement('span');
-  el.className = 'keys-combo';
-  combo.split(' or ').forEach((alt, i) => {
-    if (i) el.append(' or ');
-    for (const key of alt.split(' ')) {
-      const kbd = document.createElement('kbd');
-      kbd.textContent = key;
-      el.append(kbd);
-    }
-  });
+  el.className = 'cmd';
+  el.innerHTML = '<span class="cmd-name"></span> <span class="cmd-args"></span>';
+  el.firstChild.textContent = name;
+  el.lastChild.textContent = options.join(' ');
   return el;
+}
+
+function typeCommand(command) {
+  const name = command.split(' ')[0];
+  toggleKeys(false);
+  if (focused && !focused.app && focused.running) window.api.write(focused.id, `${name} `);
 }
 
 function renderKeys() {
@@ -648,9 +666,9 @@ function renderKeys() {
   const cols = document.createElement('div');
   cols.className = 'keys-cols';
   keysList.replaceChildren(cols);
-  for (const group of KEYBINDS) {
-    const rows = group.keys.filter(([combo, what, note = '']) => {
-      const text = `${group.title} ${combo} ${what} ${note}`.toLowerCase();
+  for (const group of COMMANDS) {
+    const rows = group.commands.filter(([command, what, note = '']) => {
+      const text = `${group.title} ${command} ${what} ${note}`.toLowerCase();
       return words.every((w) => text.includes(w));
     });
     if (!rows.length) continue;
@@ -658,15 +676,10 @@ function renderKeys() {
     section.className = 'keys-group';
     section.innerHTML = '<h3></h3>';
     section.querySelector('h3').textContent = group.title;
-    if (group.about) {
-      const about = document.createElement('p');
-      about.className = 'keys-about';
-      about.textContent = group.about;
-      section.append(about);
-    }
-    for (const [combo, what, note] of rows) {
+    for (const [command, what, note] of rows) {
       const row = document.createElement('div');
       row.className = 'keys-row';
+      row.title = 'Click to type this into the selected terminal';
       const desc = document.createElement('span');
       desc.className = 'keys-what';
       desc.textContent = what;
@@ -676,12 +689,13 @@ function renderKeys() {
         small.textContent = note;
         desc.append(small);
       }
-      row.append(comboEl(combo), desc);
+      row.append(commandEl(command), desc);
+      row.addEventListener('click', () => typeCommand(command));
       section.append(row);
     }
     cols.append(section);
   }
-  if (!cols.children.length) keysList.innerHTML = '<p class="keys-none">No keybinds match that.</p>';
+  if (!cols.children.length) keysList.innerHTML = '<p class="keys-none">No commands match that.</p>';
 }
 
 function toggleKeys(open = !keysSheet.classList.contains('open')) {
@@ -700,7 +714,7 @@ keysSearch.addEventListener('input', renderKeys);
 document.getElementById('keys-btn').addEventListener('click', () => toggleKeys());
 document.getElementById('keys-close').addEventListener('click', () => toggleKeys(false));
 // Programs pulled in from outside sit on top of everything in the window, so
-// they're hidden while a menu or the keybinds sheet is open.
+// they're hidden while a menu or the commands sheet is open.
 const APP_NAMES = { chatgpt: 'ChatGPT', obsidian: 'Obsidian' };
 
 function createAppPane(app) {
@@ -713,12 +727,13 @@ function createAppPane(app) {
       <span class="pane-title"></span>
       <span class="pane-path"></span>
       <span class="pane-status"></span>
-      <button class="regrab" title="Pull the window in again">↻</button>
-      <button class="enlarge" title="Enlarge / shrink (Ctrl+Shift+Enter)">⤢</button>
-      <button class="close" title="Give the window back (the program keeps running)">✕</button>
+      <button class="regrab icon-btn" title="Pull the window in again">${icon('restart')}</button>
+      <button class="enlarge icon-btn" title="Enlarge / shrink (Ctrl+Shift+Enter)">${icon('enlarge')}</button>
+      <button class="close icon-btn" title="Give the window back (the program keeps running)">${icon('close')}</button>
     </div>
     <div class="pane-body app-body"><p class="app-msg"></p></div>`;
-  el.querySelector('.pane-title').textContent = APP_NAMES[app];
+  el.querySelector('.pane-title').innerHTML = `<span class="logo logo-${app}"></span>`;
+  el.querySelector('.pane-title').append(APP_NAMES[app]);
   grid.appendChild(el);
 
   const p = { id, app, el, body: el.querySelector('.app-body'), statusEl: el.querySelector('.pane-status'), attached: false };
@@ -742,7 +757,7 @@ async function attachApp(p) {
   const res = await window.api.attachApp(p.id, p.app);
   if (!p.el.isConnected) return window.api.releaseApp(p.id); // closed meanwhile
   if (res.error) {
-    p.el.querySelector('.app-msg').textContent = `${res.error}. Click ↻ to try again.`;
+    p.el.querySelector('.app-msg').textContent = `${res.error}. Click the circular arrow to try again.`;
     setStatus(p, 'not inside', true);
     return;
   }
@@ -794,7 +809,7 @@ window.api.onAppCheck((gone, titles) => {
     if (!p.app) continue;
     if (gone.includes(p.id)) {
       p.attached = false;
-      p.el.querySelector('.app-msg').textContent = `${APP_NAMES[p.app]} was closed. Click ↻ to open it again.`;
+      p.el.querySelector('.app-msg').textContent = `${APP_NAMES[p.app]} was closed. Click the circular arrow to open it again.`;
       setStatus(p, 'closed', true);
     } else if (titles[p.id] != null) {
       p.el.querySelector('.pane-path').textContent = titles[p.id];

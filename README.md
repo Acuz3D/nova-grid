@@ -7,7 +7,7 @@ A Windows app that runs several Claude Code terminals side by side in one window
 - MCP servers shown per folder
 - ChatGPT and Obsidian (the desktop apps) pulled into panes alongside the terminals
 - Video backgrounds (import a file or paste a YouTube link), with looping, volume and auto-play of the next video
-- A Keybinds sheet (F1) listing every Claude Code shortcut
+- A Commands sheet (F1) listing all of Claude's / commands; click one to type it into the selected terminal
 
 ## Run it
 
@@ -26,4 +26,4 @@ Needs [Claude Code](https://claude.com/claude-code) installed and signed in. Dow
 npm run dist
 ```
 
-This makes `dist/Nova Grid Setup <version>.exe`. Running it installs Nova Grid with a Start menu and desktop shortcut, and it can be removed again from Windows' Installed apps list. The installed app keeps its background videos in `%APPDATA%\Nova Grid\backgrounds`.
+This makes `dist/Nova Grid Setup <version>.exe`. Double-click it and Nova Grid installs and opens, with no questions asked. It adds Start menu and desktop shortcuts, and can be removed from Windows' Installed apps list. The installed app keeps its background videos in `%APPDATA%\Nova Grid\backgrounds`.

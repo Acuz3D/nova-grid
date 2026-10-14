@@ -1,6 +1,20 @@
+/* Black and white, soft and quiet, after the app icon: thin serif lettering,
+   faint hairline borders, and white light for whatever is selected. */
 :root {
   /* how solid the terminals are; lowered when a background video plays */
   --pane-alpha: 1;
+  --bar-h: 40px; /* top bar; also the height of the window buttons in main.js */
+  --bg: #0b0b0c;
+  --panel: #141415;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --text: #e4e4e4;
+  --muted: #8d8d8d;
+  --dim: #5a5a5a;
+  --glow: rgba(255, 255, 255, 0.55);
+  --serif: 'Sitka Banner', 'Sitka Display', Constantia, Georgia, serif;
+  --serif-small: 'Sitka Text', Constantia, Georgia, serif;
+  --mono: 'Cascadia Mono', Consolas, monospace;
 }
 
 * {
@@ -11,10 +25,10 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: #1a1b1e;
-  color: #d8d8dc;
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  font-size: 13px;
+  background: radial-gradient(ellipse at 50% 35%, #1b1b1c 0%, var(--bg) 70%);
+  color: var(--text);
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  font-size: 12.5px;
   overflow: hidden;
 }
 
@@ -23,95 +37,263 @@ body {
   flex-direction: column;
 }
 
+::selection {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* ---------- buttons and icons ---------- */
+
+button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: #cfcfcf;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 4px 10px;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+button:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--line-strong);
+  color: #fff;
+}
+
+button:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+button:disabled:hover {
+  background: transparent;
+  border-color: var(--line);
+}
+
+svg.icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* square buttons holding just an icon */
+button.icon-btn {
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  justify-content: center;
+}
+
+/* ChatGPT and Obsidian logos, drawn in the text colour */
+.logo {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  background: currentColor;
+  -webkit-mask: var(--logo) center / contain no-repeat;
+}
+
+.logo-chatgpt {
+  --logo: url('icons/chatgpt.png');
+}
+
+.logo-obsidian {
+  --logo: url('icons/obsidian.svg');
+}
+
+input[type='text'] {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 5px 9px;
+  font: inherit;
+}
+
+input[type='text']:focus {
+  outline: none;
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04);
+}
+
+input[type='text']::placeholder {
+  color: var(--dim);
+}
+
+input[type='range'],
+input[type='checkbox'] {
+  accent-color: #e8e8e8;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+/* ---------- top bar (also the window's title bar) ---------- */
+
 #toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 10px;
-  background: rgba(34, 35, 39, calc(0.4 + 0.6 * var(--pane-alpha)));
+  gap: 8px;
+  height: var(--bar-h);
+  /* room for Windows' minimise / maximise / close on the right */
+  padding: 0 calc(140px + 8px) 0 12px;
+  background: rgba(11, 11, 12, calc(0.45 + 0.55 * var(--pane-alpha)));
+  border-bottom: 1px solid var(--line);
   position: relative;
   z-index: 2;
-  border-bottom: 1px solid #2f3036;
   flex: none;
+  -webkit-app-region: drag;
+  user-select: none;
 }
 
+#toolbar button,
+#toolbar input,
+#bg-menu,
+#usage {
+  -webkit-app-region: no-drag;
+}
+
+.brand-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.08);
+}
+
+/* "— N o v a  G r i d —", as on the icon */
 .brand {
-  font-weight: 600;
-  color: #e8a87c;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 10px 0 4px;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 17px;
+  letter-spacing: 0.34em;
+  color: #f2f2f2;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.25);
+}
+
+.brand::before,
+.brand::after {
+  content: '';
+  width: 18px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+}
+
+.sep {
+  width: 1px;
+  height: 18px;
+  background: var(--line);
+  margin: 0 2px;
 }
 
 #count {
-  color: #8b8c93;
+  color: var(--dim);
+  font-size: 11px;
+  letter-spacing: 0.04em;
 }
+
+#app-btns {
+  display: flex;
+  gap: 4px;
+}
+
+/* ---------- usage ---------- */
 
 #usage {
   margin-left: auto;
   display: flex;
   gap: 18px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .limit {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  gap: 7px;
+  font-size: 11px;
   cursor: default;
 }
 
 .limit-name {
-  color: #8b8c93;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 10px;
 }
 
 .bar {
-  width: 70px;
-  height: 6px;
-  background: #2f3036;
-  border-radius: 3px;
+  width: 64px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
   overflow: hidden;
 }
 
 .fill {
   display: block;
   height: 100%;
-  background: #7cb98a;
+  background: #9a9a9a;
+  border-radius: 2px;
 }
 
 .fill.warn {
-  background: #e8c37c;
+  background: #d8d8d8;
 }
 
 .fill.high {
-  background: #e57373;
+  background: #fff;
+  box-shadow: 0 0 6px var(--glow);
 }
 
 .limit-pct {
-  min-width: 28px;
+  min-width: 26px;
+  color: #cfcfcf;
 }
 
 .limit-reset {
-  color: #6b6c73;
-  font-size: 11px;
+  color: var(--dim);
+  font-size: 10.5px;
 }
 
-button {
-  background: #2d2e34;
-  color: #d8d8dc;
-  border: 1px solid #3a3b42;
-  border-radius: 4px;
-  padding: 4px 10px;
-  font: inherit;
-  cursor: pointer;
+/* keep the crowded top bar on one line */
+#toolbar button,
+.brand,
+#count,
+.limit,
+.limit-reset {
+  white-space: nowrap;
 }
 
-button:hover {
-  background: #383940;
-}
+/* ---------- grid and panes ---------- */
 
 #grid {
   flex: 1;
   display: grid;
-  gap: 4px;
-  padding: 4px;
+  gap: 8px;
+  padding: 8px;
   min-height: 0;
   position: relative;
   z-index: 1;
@@ -122,14 +304,16 @@ button:hover {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: rgba(20, 21, 24, var(--pane-alpha));
-  border: 1px solid #2f3036;
-  border-radius: 4px;
+  background: rgba(14, 14, 15, var(--pane-alpha));
+  border: 1px solid var(--line);
+  border-radius: 10px;
   overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .pane.focused {
-  border-color: #e8a87c;
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 0 22px rgba(255, 255, 255, 0.06);
 }
 
 .pane.hidden {
@@ -140,26 +324,39 @@ button:hover {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 6px 3px 8px;
-  background: rgba(34, 35, 39, calc(0.3 + 0.7 * var(--pane-alpha)));
-  border-bottom: 1px solid #2f3036;
+  height: 32px;
+  padding: 0 6px 0 12px;
+  background: rgba(255, 255, 255, calc(0.015 + 0.01 * var(--pane-alpha)));
+  border-bottom: 1px solid var(--line);
   user-select: none;
   flex: none;
 }
 
 .pane-num {
-  color: #6b6c73;
-  font-size: 11px;
+  color: var(--dim);
+  font-size: 10px;
+  min-width: 8px;
 }
 
 .pane-title {
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--serif-small);
+  font-weight: 400;
+  font-size: 13.5px;
+  letter-spacing: 0.05em;
+  color: #f0f0f0;
   white-space: nowrap;
 }
 
+.pane.focused .pane-title {
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
 .pane-path {
-  color: #6b6c73;
-  font-size: 11px;
+  color: var(--dim);
+  font-size: 10.5px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -168,45 +365,123 @@ button:hover {
 }
 
 .pane-status {
-  font-size: 11px;
-  color: #8b8c93;
+  font-size: 10.5px;
+  color: var(--muted);
+  font-style: italic;
 }
 
 .pane-status.exited {
-  color: #e57373;
+  color: #fff;
 }
 
 .pane-header button {
-  padding: 1px 7px;
-  font-size: 12px;
+  padding: 2px 7px;
+  font-size: 11px;
+  border-color: transparent;
+}
+
+.pane-header button.icon-btn {
+  width: 24px;
+  height: 22px;
+  padding: 0;
+}
+
+.pane-header button.icon-btn svg.icon {
+  width: 13px;
+  height: 13px;
+}
+
+.pane-header button:hover {
+  border-color: var(--line);
+}
+
+.pane-header .close:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .pane-header select {
-  background: #2d2e34;
-  color: #d8d8dc;
-  border: 1px solid #3a3b42;
-  border-radius: 4px;
+  appearance: none;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid transparent;
+  border-radius: 6px;
   font: inherit;
-  font-size: 12px;
-  padding: 1px 2px;
+  font-size: 11px;
+  padding: 2px 6px;
   cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.pane-header select:hover,
+.pane-header select:focus {
+  outline: none;
+  color: var(--text);
+  border-color: var(--line);
+}
+
+.pane-header select option {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.pane-header .mcp {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  display: block;
+}
+
+.pane-header .mcp.warn {
+  color: #c4c4c4;
+  font-style: italic;
 }
 
 .pane-body {
   flex: 1;
   min-height: 0;
-  padding: 4px 0 0 6px;
+  padding: 6px 0 0 10px;
 }
+
+/* xterm paints its scroll area opaque even with a transparent theme; the
+   pane behind it supplies the background instead. */
+.pane .xterm .xterm-viewport {
+  background-color: transparent !important;
+}
+
+/* xterm draws its own scrollbar; hide the plain Windows one under it */
+.pane .xterm .xterm-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+/* the pulled-in program covers this; the message shows while it isn't there */
+.app-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.app-msg {
+  margin: 0;
+  padding: 0 20px;
+  color: var(--muted);
+  text-align: center;
+  font-style: italic;
+}
+
+/* ---------- nothing open ---------- */
 
 #empty {
   position: absolute;
-  inset: 40px 0 0 0;
+  inset: var(--bar-h) 0 0 0;
   display: none;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  color: #8b8c93;
+  gap: 22px;
+  color: var(--muted);
 }
 
 #empty.show {
@@ -214,10 +489,30 @@ button:hover {
   z-index: 1;
 }
 
-#empty button {
-  padding: 8px 16px;
-  font-size: 14px;
+#empty .brand {
+  font-size: 34px;
+  letter-spacing: 0.42em;
+  margin: 0;
+  gap: 18px;
+  text-shadow: 0 0 24px rgba(255, 255, 255, 0.3);
 }
+
+#empty .brand::before,
+#empty .brand::after {
+  width: 90px;
+}
+
+#empty p {
+  margin: 0;
+  font-style: italic;
+}
+
+#empty button {
+  padding: 8px 18px;
+  font-size: 13px;
+}
+
+/* ---------- background ---------- */
 
 #bg-video {
   position: fixed;
@@ -239,24 +534,25 @@ button:hover {
   gap: 4px;
 }
 
-#bg-sound:disabled {
-  opacity: 0.4;
-  cursor: default;
+/* a floating panel under the top bar */
+#bg-panel,
+#keys-box {
+  background: rgba(20, 20, 21, 0.96);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(14px);
 }
 
 #bg-panel {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 10px);
   left: 0;
-  width: 300px;
-  padding: 10px;
+  width: 320px;
+  padding: 14px;
   display: none;
   flex-direction: column;
-  gap: 8px;
-  background: #222327;
-  border: 1px solid #3a3b42;
-  border-radius: 6px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  gap: 10px;
   z-index: 10;
 }
 
@@ -267,28 +563,38 @@ button:hover {
 #bg-panel label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  color: #b8b8bd;
+  gap: 5px;
+  color: #bdbdbd;
 }
 
-#bg-panel input[type='range'] {
-  accent-color: #e8a87c;
+#bg-panel label span {
+  color: var(--muted);
+}
+
+#bg-panel label.bg-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.bg-check input {
+  margin: 0;
 }
 
 .bg-note {
+  margin: -4px 0 0;
+  font-size: 10.5px;
+  color: var(--dim);
+}
+
+#bg-status {
   margin: 0;
-  font-size: 11px;
-  color: #6b6c73;
+  color: var(--muted);
+  font-style: italic;
 }
 
-/* xterm paints its scroll area opaque even with a transparent theme; the
-   pane behind it supplies the background instead. */
-.pane .xterm .xterm-viewport {
-  background-color: transparent !important;
-}
-
-/* xterm draws its own scrollbar; hide the plain Windows one under it */
-.pane .xterm .xterm-viewport::-webkit-scrollbar {
+#bg-status:empty {
   display: none;
 }
 
@@ -299,91 +605,77 @@ button:hover {
 
 .bg-row button {
   flex: 1;
+  justify-content: center;
+}
+
+#bg-url {
+  flex: 2;
+  min-width: 0;
+  font-size: 12px;
 }
 
 #bg-list {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  max-height: 200px;
+  gap: 2px;
+  max-height: 210px;
   overflow-y: auto;
+  padding: 4px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 
 .bg-item {
   display: flex;
-  gap: 3px;
+  gap: 2px;
+}
+
+.bg-item button {
+  border-color: transparent;
 }
 
 .bg-item .bg-pick {
+  display: block;
   flex: 1;
   min-width: 0;
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--muted);
+}
+
+.bg-item .bg-pick:hover {
+  color: var(--text);
 }
 
 .bg-item.current .bg-pick {
-  border-color: #e8a87c;
-  color: #e8a87c;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.35);
 }
 
 .bg-item .bg-delete {
-  padding: 4px 7px;
-  color: #8b8c93;
+  width: 26px;
+  padding: 0;
+  justify-content: center;
+  color: var(--dim);
 }
 
 .bg-item .bg-delete:hover {
-  color: #e57373;
+  color: #fff;
 }
 
-#bg-url {
-  flex: 2;
-  min-width: 0;
-  background: #1a1b1e;
-  color: #d8d8dc;
-  border: 1px solid #3a3b42;
-  border-radius: 4px;
-  padding: 4px 6px;
-  font: inherit;
-  font-size: 12px;
-}
+/* ---------- commands sheet ---------- */
 
-#bg-url:focus {
-  outline: none;
-  border-color: #e8a87c;
-}
-
-#bg-status:empty {
-  display: none;
-}
-
-.pane-header .mcp {
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #7cb98a;
-  background: transparent;
-  border-color: transparent;
-}
-
-.pane-header .mcp:hover {
-  border-color: #3a3b42;
-}
-
-.pane-header .mcp.warn {
-  color: #e8c37c;
-}
-
-/* Keybinds sheet: covers the grid, toggled with the Keybinds button or F1 */
 #keys-sheet {
   position: fixed;
-  inset: 41px 0 0 0;
+  inset: var(--bar-h) 0 0 0;
   display: none;
   justify-content: center;
-  padding: 16px;
-  background: rgba(10, 10, 12, 0.6);
+  padding: 20px;
+  background: rgba(5, 5, 6, 0.65);
+  backdrop-filter: blur(3px);
   z-index: 20;
 }
 
@@ -395,160 +687,108 @@ button:hover {
   display: flex;
   flex-direction: column;
   width: min(1100px, 100%);
-  background: #222327;
-  border: 1px solid #3a3b42;
-  border-radius: 6px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
   min-height: 0;
 }
 
 #keys-top {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-bottom: 1px solid #2f3036;
+  gap: 14px;
+  padding: 12px 14px 12px 18px;
+  border-bottom: 1px solid var(--line);
 }
 
 .keys-heading {
-  font-weight: 600;
-  font-size: 15px;
-  color: #e8a87c;
+  font-family: var(--serif);
+  font-size: 18px;
+  letter-spacing: 0.18em;
+  color: #f2f2f2;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
 }
 
 #keys-search {
   flex: 1;
-  background: #1a1b1e;
-  color: #d8d8dc;
-  border: 1px solid #3a3b42;
-  border-radius: 4px;
-  padding: 5px 8px;
-  font: inherit;
-}
-
-#keys-search:focus {
-  outline: none;
-  border-color: #e8a87c;
 }
 
 #keys-list {
   overflow-y: auto;
-  padding: 4px 16px 16px;
+  padding: 4px 18px 18px;
 }
 
 /* inside the scrolling list, so the columns grow downwards, not sideways */
 .keys-cols {
   columns: 2 440px;
-  column-gap: 28px;
+  column-gap: 32px;
 }
 
 .keys-group {
   break-inside: avoid;
-  padding-top: 12px;
+  padding-top: 14px;
 }
 
 .keys-group h3 {
   margin: 0 0 2px;
-  font-size: 13px;
-  color: #e8a87c;
+  font-family: var(--serif);
+  font-weight: normal;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  color: #f0f0f0;
 }
 
 .keys-group .keys-about {
   margin: 0 0 6px;
   font-size: 11px;
-  color: #6b6c73;
+  color: var(--dim);
 }
 
 .keys-row {
   display: flex;
-  gap: 12px;
-  padding: 3px 0;
-  border-bottom: 1px solid #2a2b30;
+  gap: 14px;
+  padding: 5px 8px;
+  margin: 0 -8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s;
 }
 
-.keys-combo {
+.keys-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.cmd {
   flex: none;
-  width: 190px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 3px;
-}
-
-kbd {
-  font-family: 'Cascadia Mono', Consolas, monospace;
-  font-size: 11px;
-  padding: 1px 5px;
-  background: #2d2e34;
-  border: 1px solid #44454d;
-  border-bottom-width: 2px;
-  border-radius: 3px;
+  width: 210px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.cmd-name {
+  color: #f2f2f2;
+}
+
+.keys-row:hover .cmd-name {
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.45);
+}
+
+.cmd-args {
+  color: var(--dim);
+}
+
 .keys-what {
-  color: #b8b8bd;
+  color: #bdbdbd;
 }
 
 .keys-what .keys-note {
   display: block;
   font-size: 11px;
-  color: #8b8c93;
+  color: var(--dim);
 }
 
 .keys-none {
-  color: #6b6c73;
+  color: var(--dim);
   padding-top: 16px;
-}
-
-#bg-panel label.bg-check {
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-}
-
-.bg-check input {
-  margin: 0;
-  accent-color: #e8a87c;
-}
-
-.brand-icon {
-  width: 20px;
-  height: 20px;
-  margin-right: -6px;
-}
-
-#app-btns {
-  display: flex;
-  gap: 4px;
-}
-
-/* the pulled-in program covers this; the message shows while it isn't there */
-.app-body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-
-.app-msg {
-  margin: 0;
-  padding: 0 20px;
-  color: #8b8c93;
-  text-align: center;
-}
-
-/* keep the crowded top bar on one line */
-#toolbar button,
-.brand,
-#count,
-.limit,
-.limit-reset {
-  white-space: nowrap;
-}
-
-#usage {
-  min-width: 0;
-  overflow: hidden;
+  font-style: italic;
 }
