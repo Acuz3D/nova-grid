@@ -11,8 +11,26 @@
   <video id="bg-video" muted autoplay playsinline></video>
 
   <header id="toolbar">
-    <img class="brand-icon" src="../icon.png" alt="" />
-    <span class="brand">Nova Grid</span>
+    <div id="about-menu">
+      <button id="about-btn" title="About Nova Grid, and updates">
+        <img class="brand-icon" src="../icon.png" alt="" />
+        <span class="brand">Nova Grid</span>
+      </button>
+      <div id="about-panel">
+        <span class="keys-heading">Nova Grid</span>
+        <p id="about-version" class="about-line"></p>
+        <p id="about-update" class="about-line"></p>
+        <div class="bg-row">
+          <button id="about-check">Check for updates</button>
+          <button id="about-install" class="primary" hidden>Restart to update</button>
+        </div>
+        <div class="bg-row">
+          <button id="about-github" title="Nova Grid's page on GitHub, with every version">GitHub page</button>
+          <button id="about-data" title="Where your terminals, background choice and videos are kept">Settings folder</button>
+        </div>
+        <p class="bg-note">Updates download by themselves and install when you close Nova Grid.</p>
+      </div>
+    </div>
     <button id="add-btn" title="Open a new Claude terminal in a folder (Ctrl+Shift+T)"><i data-icon="plus"></i>Terminal</button>
     <div id="app-btns">
       <button data-app="chatgpt" class="icon-btn" title="ChatGPT: pull its window into a pane (it opens it if needed)"><span class="logo logo-chatgpt"></span></button>
@@ -59,6 +77,7 @@
     </div>
     <span id="count"></span>
     <div id="usage"></div>
+    <button id="update-btn" class="primary" hidden title="A new version of Nova Grid is ready. Restarting closes your terminals; they reopen afterwards">Restart to update</button>
     <button id="keys-btn" class="icon-btn" title="Claude's / commands (F1)&#10;&#10;Nova Grid's own keys:&#10;F1 show or hide Claude's commands&#10;Ctrl+Shift+T new terminal&#10;Ctrl+Shift+W close the selected pane&#10;Ctrl+1–9 jump to a pane&#10;Ctrl+Shift+Enter or double-click a title to enlarge&#10;Ctrl+C copy selected text · Ctrl+V paste text"><i data-icon="slash"></i></button>
     <div id="win-btns">
       <button id="win-min" title="Minimise"><i data-icon="winMin"></i></button>
@@ -78,12 +97,39 @@
     </div>
   </div>
 
+  <!-- shown at launch when Claude Code isn't installed -->
+  <div id="setup-sheet">
+    <div id="setup-box">
+      <span class="keys-heading">Claude Code isn't installed</span>
+      <p>Nova Grid runs Claude Code in each terminal, so it needs Claude Code first. It takes about a minute.</p>
+      <ol>
+        <li>Open <b>PowerShell</b> (search for it in the Start menu).</li>
+        <li>
+          Paste this and press Enter:
+          <div class="setup-command">
+            <code id="setup-command">irm https://claude.ai/install.ps1 | iex</code>
+            <button id="setup-copy">Copy</button>
+          </div>
+        </li>
+        <li>When it finishes, come back here and press <b>Check again</b>.</li>
+      </ol>
+      <p class="bg-note">Claude Code needs a Claude Pro, Max, Team or Enterprise plan (or an Anthropic Console account). The first terminal you open will ask you to sign in.</p>
+      <p id="setup-status" class="bg-note"></p>
+      <div class="bg-row">
+        <button id="setup-guide">Install guide</button>
+        <button id="setup-later">Not now</button>
+        <button id="setup-check" class="primary">Check again</button>
+      </div>
+    </div>
+  </div>
+
   <main id="grid"></main>
 
   <div id="empty">
     <span class="brand">Nova Grid</span>
     <p>Nothing open yet.</p>
     <button id="empty-add-btn"><i data-icon="plus"></i>Pick a folder to start Claude in</button>
+    <p id="empty-signin" hidden>Claude will ask you to sign in the first time a terminal opens.</p>
   </div>
 
   <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>

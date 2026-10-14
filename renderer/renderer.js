@@ -785,7 +785,7 @@ async function attachApp(p) {
 
 // Tell the main process where each pulled-in window goes, in screen pixels.
 function placeApps() {
-  const covered = keysSheet.classList.contains('open') || bgPanel.classList.contains('open');
+  const covered = [keysSheet, bgPanel, aboutPanel, setupSheet].some((el) => el.classList.contains('open'));
   const scale = window.devicePixelRatio;
   for (const p of panes) {
     if (!p.attached) continue;
@@ -846,6 +846,74 @@ window.addEventListener('keydown', (e) => {
 });
 renderKeys();
 
+// About panel: version and updates. The installed app checks GitHub for a
+// newer release, downloads it in the background and installs it on close.
+const aboutPanel = document.getElementById('about-panel');
+const aboutUpdate = document.getElementById('about-update');
+const aboutCheck = document.getElementById('about-check');
+const updateButtons = [document.getElementById('update-btn'), document.getElementById('about-install')];
+
+function showUpdate(u) {
+  const text = {
+    idle: '',
+    dev: 'Updates only work in the installed app.',
+    checking: 'Checking for updates…',
+    latest: 'You have the latest version.',
+    downloading: `Downloading version ${u.version}… ${u.percent || 0}%`,
+    ready: `Version ${u.version} is ready. It installs when you close Nova Grid, or restart now.`,
+    error: `Couldn't check for updates: ${u.message}`,
+  };
+  aboutUpdate.textContent = text[u.state] ?? '';
+  aboutUpdate.title = u.detail || '';
+  aboutCheck.disabled = ['dev', 'checking', 'downloading', 'ready'].includes(u.state);
+  for (const button of updateButtons) button.hidden = u.state !== 'ready';
+}
+
+document.getElementById('about-btn').addEventListener('click', () => aboutPanel.classList.toggle('open'));
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('#about-menu')) aboutPanel.classList.remove('open');
+});
+aboutCheck.addEventListener('click', () => window.api.checkForUpdates());
+for (const button of updateButtons) button.addEventListener('click', () => window.api.installUpdate());
+document.getElementById('about-github').addEventListener('click', () => window.api.openLink('github'));
+document.getElementById('about-data').addEventListener('click', () => window.api.openDataFolder());
+window.api.onUpdate(showUpdate);
+window.api.updateState().then(showUpdate);
+window.api.appInfo().then((info) => {
+  document.getElementById('about-version').textContent = `Version ${info.version}${info.installed ? '' : ' (running from the code)'}`;
+  document.getElementById('about-btn').title = `Nova Grid ${info.version}: about, and updates`;
+});
+
+// First launch on a new PC: say what's missing before any terminal fails.
+const setupSheet = document.getElementById('setup-sheet');
+const setupStatus = document.getElementById('setup-status');
+
+async function checkSetup(fromButton) {
+  const setup = await window.api.checkSetup();
+  setupSheet.classList.toggle('open', !setup.claude);
+  document.getElementById('empty-signin').hidden = !setup.claude || setup.signedIn;
+  if (fromButton) {
+    setupStatus.textContent = setup.claude ? '' : "Still can't find Claude Code. If the install finished, try closing and reopening Nova Grid.";
+  }
+  placeApps();
+  return setup;
+}
+
+document.getElementById('setup-copy').addEventListener('click', (e) => {
+  window.api.copy(document.getElementById('setup-command').textContent);
+  e.currentTarget.textContent = 'Copied';
+});
+document.getElementById('setup-guide').addEventListener('click', () => window.api.openLink('claude'));
+document.getElementById('setup-later').addEventListener('click', () => {
+  setupSheet.classList.remove('open');
+  placeApps();
+});
+document.getElementById('setup-check').addEventListener('click', async () => {
+  const setup = await checkSetup(true);
+  // Terminals that failed to start while it was missing get going now.
+  if (setup.claude) panes.filter((p) => !p.app && !p.running).forEach((p) => startClaude(p));
+});
+
 // Hide the top-bar icon if icon.png is missing.
 const brandIcon = document.querySelector('.brand-icon');
 brandIcon.addEventListener('error', () => brandIcon.remove());
@@ -875,6 +943,7 @@ window.addEventListener('keydown', (e) => {
 
 // Reopen the folders from last time.
 (async () => {
+  checkSetup();
   const saved = await window.api.loadPanes();
   // (skips programs no longer offered)
   saved.filter((s) => !s.app || APP_NAMES[s.app]).forEach((s) => (s.app ? createAppPane(s.app) : createPane(s.cwd, s.effort || '', s.model || '')));

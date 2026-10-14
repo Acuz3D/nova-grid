@@ -11,9 +11,11 @@ A Windows app that runs several Claude Code terminals side by side in one window
 
 ## Download
 
-Get **Nova-Grid-Setup-1.0.0.exe** from the [latest release](https://github.com/Acuz3D/nova-grid/releases/latest) and double-click it. Nova Grid installs and opens, with Start menu and desktop shortcuts. If Windows says "Windows protected your PC" (the app isn't signed), click **More info**, then **Run anyway**.
+Get **Nova-Grid-Setup-<version>.exe** from the [latest release](https://github.com/Acuz3D/nova-grid/releases/latest) and double-click it. Nova Grid installs and opens, with Start menu and desktop shortcuts. If Windows says "Windows protected your PC" (the app isn't signed), click **More info**, then **Run anyway**.
 
-Needs [Claude Code](https://claude.com/claude-code) installed and signed in.
+Needs [Claude Code](https://claude.com/claude-code). If it isn't installed, Nova Grid shows how to install it; the first terminal you open asks you to sign in. Node.js isn't needed.
+
+From 1.1.0 on, Nova Grid updates itself: it checks GitHub when it opens, downloads a new version in the background, and installs it when you close it (or click **Restart to update**). Click the Nova Grid name in the top bar to see your version or check by hand. Version 1.0.0 has no updater, so download 1.1.0 once by hand.
 
 ## Run it from the source
 
@@ -32,4 +34,14 @@ Needs [Claude Code](https://claude.com/claude-code) installed and signed in. Dow
 npm run dist
 ```
 
-This makes `dist/Nova Grid Setup <version>.exe`. Double-click it and Nova Grid installs and opens, with no questions asked. It adds Start menu and desktop shortcuts, and can be removed from Windows' Installed apps list. The installed app keeps its background videos in `%APPDATA%\Nova Grid\backgrounds`.
+This makes `dist/Nova-Grid-Setup-<version>.exe`. Double-click it and Nova Grid installs and opens, with no questions asked. It adds Start menu and desktop shortcuts, and can be removed from Windows' Installed apps list. The installed app keeps its background videos in `%APPDATA%\Nova Grid\backgrounds`.
+
+## Publish a new version
+
+1. Raise `version` in `package.json` (for example 1.1.0 → 1.2.0).
+2. Run `npm run dist`.
+3. Make a GitHub release with **all three** files from `dist`, so installed copies can update:
+
+```
+gh release create v1.2.0 dist/Nova-Grid-Setup-1.2.0.exe dist/Nova-Grid-Setup-1.2.0.exe.blockmap dist/latest.yml --title "Nova Grid 1.2.0" --notes "What changed"
+```

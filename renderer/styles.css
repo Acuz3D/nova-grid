@@ -77,6 +77,22 @@ button:disabled:hover {
   border-color: var(--line);
 }
 
+/* the one thing to press: white outline with a soft glow */
+button.primary {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.12);
+}
+
+button.primary:hover {
+  border-color: #fff;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
+}
+
+[hidden] {
+  display: none !important;
+}
+
 svg.icon {
   width: 15px;
   height: 15px;
@@ -167,6 +183,7 @@ input[type='checkbox'] {
 #toolbar button,
 #toolbar input,
 #bg-menu,
+#about-menu,
 #usage {
   -webkit-app-region: no-drag;
 }
@@ -204,6 +221,28 @@ input[type='checkbox'] {
   height: 22px;
   border-radius: 6px;
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.08);
+}
+
+/* the icon and name, which open the About panel */
+#about-menu {
+  position: relative;
+  display: flex;
+}
+
+#about-btn {
+  gap: 8px;
+  padding: 0 0 0 2px;
+  border-color: transparent;
+}
+
+#about-btn:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
+#about-btn:hover .brand {
+  color: #fff;
+  text-shadow: 0 0 14px rgba(255, 255, 255, 0.5);
 }
 
 /* "— N o v a  G r i d —", as on the icon */
@@ -563,6 +602,8 @@ input[type='checkbox'] {
 
 /* a floating panel under the top bar */
 #bg-panel,
+#about-panel,
+#setup-box,
 #keys-box {
   background: rgba(20, 20, 21, 0.96);
   border: 1px solid var(--line-strong);
@@ -818,4 +859,113 @@ input[type='checkbox'] {
   color: var(--dim);
   padding-top: 16px;
   font-style: italic;
+}
+
+/* ---------- about ---------- */
+
+#about-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: 300px;
+  padding: 14px;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 10;
+  cursor: default;
+}
+
+#about-panel.open {
+  display: flex;
+}
+
+.about-line {
+  margin: 0;
+  color: #bdbdbd;
+}
+
+#about-update {
+  color: var(--muted);
+}
+
+#update-btn {
+  margin-left: 4px;
+}
+
+/* ---------- setup (Claude Code missing) ---------- */
+
+#setup-sheet {
+  position: fixed;
+  inset: var(--bar-h) 0 0 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(5, 5, 6, 0.75);
+  backdrop-filter: blur(3px);
+  z-index: 30;
+}
+
+#setup-sheet.open {
+  display: flex;
+}
+
+#setup-box {
+  width: min(520px, 100%);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: #cfcfcf;
+  line-height: 1.5;
+}
+
+#setup-box p,
+#setup-box ol {
+  margin: 0;
+}
+
+#setup-box ol {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#setup-box b {
+  color: #fff;
+  font-weight: 600;
+}
+
+.setup-command {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.setup-command code {
+  flex: 1;
+  padding: 6px 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  user-select: all;
+}
+
+#setup-status {
+  margin: 0;
+  color: #fff;
+}
+
+#setup-status:empty {
+  display: none;
+}
+
+#empty-signin {
+  font-size: 11.5px;
+  color: var(--dim);
 }

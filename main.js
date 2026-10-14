@@ -5,6 +5,7 @@ const os = require('os');
 const { pathToFileURL } = require('url');
 const { spawn } = require('child_process');
 const pty = require('node-pty');
+const { autoUpdater } = require('electron-updater');
 const embed = require('./embed');
 
 // Let the background video play with sound without a click first.
@@ -56,9 +57,15 @@ function withUrl(background) {
   return { ...background, url: pathToFileURL(background.path).href };
 }
 
-// Find claude on PATH so node-pty gets a full path to launch.
+// Find claude on PATH so node-pty gets a full path to launch. Also look where
+// the installers put it, since Claude Code installed while Nova Grid is open
+// isn't on Nova Grid's copy of PATH yet.
 function findClaude() {
-  const dirs = (process.env.PATH || '').split(path.delimiter);
+  const dirs = [
+    ...(process.env.PATH || '').split(path.delimiter),
+    path.join(os.homedir(), '.local', 'bin'),
+    path.join(process.env.APPDATA || '', 'npm'),
+  ];
   const exts = process.platform === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
   for (const dir of dirs) {
     for (const ext of exts) {
@@ -68,6 +75,27 @@ function findClaude() {
   }
   return null;
 }
+
+// What a new user is missing: Claude Code itself, or signing in to it.
+const CLAUDE_LOGIN_FILE = path.join(os.homedir(), '.claude', '.credentials.json');
+ipcMain.handle('setup:check', () => ({
+  claude: !!findClaude(),
+  signedIn: fs.existsSync(CLAUDE_LOGIN_FILE) || !!process.env.ANTHROPIC_API_KEY,
+}));
+
+ipcMain.handle('app:info', () => ({
+  version: app.getVersion(),
+  installed: app.isPackaged,
+  dataDir: app.getPath('userData'),
+}));
+
+const LINKS = {
+  github: 'https://github.com/Acuz3D/nova-grid',
+  releases: 'https://github.com/Acuz3D/nova-grid/releases',
+  claude: 'https://code.claude.com/docs/en/setup',
+};
+ipcMain.on('open-link', (_e, key) => LINKS[key] && shell.openExternal(LINKS[key]));
+ipcMain.on('open-data-folder', () => shell.openPath(app.getPath('userData')));
 
 // If Nova Grid was itself started from inside a Claude session, drop that
 // session's markers so each pane starts as its own independent Claude.
@@ -295,22 +323,50 @@ ipcMain.handle('folder:pick', async () => {
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 const MODELS = ['fable', 'opus', 'sonnet', 'haiku'];
 
+// Each pane's status line runs statusline.js with Nova Grid's own copy of Node
+// (ELECTRON_RUN_AS_NODE), so Node.js doesn't need to be installed. Claude
+// runs status lines in Git Bash, PowerShell or CMD depending on the PC, so
+// the launcher comes in two forms (like npm's): a script for Git Bash and a
+// .cmd for the other two. Its folder goes on each pane's PATH and the usage
+// file is passed in NOVA_GRID_USAGE_FILE, so the command needs no quoting.
+const STATUS_LINE_COMMAND = 'nova-grid-statusline';
+const launcherDir = () => path.join(app.getPath('userData'), 'bin');
+
+function writeStatusLineLauncher() {
+  // Claude runs this outside the app, which can't read inside app.asar, so
+  // the installer keeps a loose copy next to it (see asarUnpack).
+  const script = path.join(__dirname.replace(/app\.asar$/, 'app.asar.unpacked'), 'statusline.js');
+  fs.mkdirSync(launcherDir(), { recursive: true });
+  fs.writeFileSync(
+    path.join(launcherDir(), STATUS_LINE_COMMAND),
+    `#!/bin/sh\nELECTRON_RUN_AS_NODE=1 exec "${fwd(process.execPath)}" "${fwd(script)}"\n`
+  );
+  fs.writeFileSync(
+    path.join(launcherDir(), `${STATUS_LINE_COMMAND}.cmd`),
+    `@echo off\r\nset ELECTRON_RUN_AS_NODE=1\r\n"${process.execPath}" "${script}"\r\n`
+  );
+}
+
+function paneEnv(id) {
+  const env = cleanEnv();
+  const pathKey = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') || 'PATH';
+  env[pathKey] = launcherDir() + path.delimiter + (env[pathKey] || '');
+  env.NOVA_GRID_USAGE_FILE = path.join(usageDir(), `${id}.json`);
+  return env;
+}
+
 // Give each pane a status line that reports its model and usage back to us.
 function paneSettingsFile(id) {
   fs.mkdirSync(usageDir(), { recursive: true });
-  const usageFile = fwd(path.join(usageDir(), `${id}.json`));
-  // Claude runs this with its own node, which can't read inside app.asar, so
-  // the installer keeps a loose copy next to it (see asarUnpack).
-  const script = fwd(path.join(__dirname.replace(/app\.asar$/, 'app.asar.unpacked'), 'statusline.js'));
   const settingsFile = path.join(usageDir(), `${id}.settings.json`);
-  const settings = { statusLine: { type: 'command', command: `node "${script}" "${usageFile}"`, padding: 0 } };
+  const settings = { statusLine: { type: 'command', command: STATUS_LINE_COMMAND, padding: 0 } };
   fs.writeFileSync(settingsFile, JSON.stringify(settings));
   return settingsFile;
 }
 
 ipcMain.handle('pty:start', (_e, { id, cwd, cols, rows, effort, model, resume }) => {
   const claude = findClaude();
-  if (!claude) return { error: 'Could not find "claude" on your PATH.' };
+  if (!claude) return { error: "Claude Code isn't installed, or Nova Grid can't find it." };
   if (!fs.existsSync(cwd)) return { error: `Folder not found: ${cwd}` };
 
   // .cmd/.bat launchers have to go through cmd.exe
@@ -328,7 +384,7 @@ ipcMain.handle('pty:start', (_e, { id, cwd, cols, rows, effort, model, resume })
     cols: cols || 80,
     rows: rows || 24,
     cwd,
-    env: cleanEnv(),
+    env: paneEnv(id),
   });
   ptys.set(id, proc);
 
@@ -482,11 +538,51 @@ function sendUsage() {
   send('usage', byPane);
 }
 
+// Updates: the installed app looks for a newer release on GitHub at launch and
+// every few hours, downloads it in the background, and installs it when Nova
+// Grid closes, or straight away from the "Restart to update" button.
+const UPDATE_CHECK_EVERY = 4 * 60 * 60 * 1000;
+let updateState = { state: 'idle' };
+
+function setUpdate(state) {
+  updateState = state;
+  send('update', state);
+}
+
+function checkForUpdates() {
+  if (!app.isPackaged) return setUpdate({ state: 'dev' });
+  if (['checking', 'downloading', 'ready'].includes(updateState.state)) return;
+  autoUpdater.checkForUpdates().catch(() => {}); // reported through 'error'
+}
+
+autoUpdater.on('checking-for-update', () => setUpdate({ state: 'checking' }));
+autoUpdater.on('update-not-available', () => setUpdate({ state: 'latest', at: Date.now() }));
+autoUpdater.on('update-available', (info) => setUpdate({ state: 'downloading', version: info.version, percent: 0 }));
+autoUpdater.on('download-progress', (p) => setUpdate({ ...updateState, percent: Math.round(p.percent) }));
+autoUpdater.on('update-downloaded', (info) => setUpdate({ state: 'ready', version: info.version }));
+autoUpdater.on('error', (err) => {
+  const detail = String(err?.message || err).split('\n')[0].slice(0, 300);
+  const message = /404|latest\.yml/.test(detail)
+    ? "the newest release on GitHub doesn't have update information"
+    : /ENOTFOUND|ETIMEDOUT|ECONNRE|net::/.test(detail)
+      ? "couldn't reach GitHub (no internet?)"
+      : 'something went wrong';
+  setUpdate({ state: 'error', message, detail });
+});
+
+ipcMain.handle('update:state', () => updateState);
+ipcMain.on('update:check', checkForUpdates);
+// silent install, then reopen Nova Grid
+ipcMain.on('update:install', () => updateState.state === 'ready' && autoUpdater.quitAndInstall(true, true));
+
 app.whenReady().then(() => {
+  writeStatusLineLauncher();
   watchUsage();
   createWindow();
   win.webContents.on('did-finish-load', sendAccountUsage);
+  win.webContents.once('did-finish-load', checkForUpdates);
   setInterval(sendAccountUsage, ACCOUNT_USAGE_EVERY);
+  setInterval(checkForUpdates, UPDATE_CHECK_EVERY);
 });
 app.on('before-quit', () => {
   embed.releaseAll();
