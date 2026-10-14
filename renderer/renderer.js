@@ -31,6 +31,13 @@ const ICONS = {
   winMax: '<rect x="6" y="6" width="12" height="12" rx="1.5"/>',
   winRestore: '<rect x="5" y="9" width="10" height="10" rx="1.5"/><path d="M9 9V6.5A1.5 1.5 0 0 1 10.5 5h7A1.5 1.5 0 0 1 19 6.5v7a1.5 1.5 0 0 1-1.5 1.5H15"/>',
   winClose: '<path d="M7 7l10 10M17 7L7 17"/>',
+  layoutGrid: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M12 4v16M4 12h16"/>',
+  layoutColumns: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9.33 4v16M14.67 4v16"/>',
+  layoutRows: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9.33h16M4 14.67h16"/>',
+  layoutMainLeft: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M14 4v16M14 9.33h6M14 14.67h6"/>',
+  layoutMainTop: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 14h16M9.33 14v6M14.67 14v6"/>',
+  moveLeft: '<path d="M15 6l-6 6 6 6"/>',
+  moveRight: '<path d="M9 6l6 6-6 6"/>',
 };
 const icon = (name) => `<svg class="icon" viewBox="0 0 24 24">${ICONS[name]}</svg>`;
 document.querySelectorAll('[data-icon]').forEach((el) => (el.outerHTML = icon(el.dataset.icon)));
@@ -43,14 +50,33 @@ function save() {
   window.api.savePanes(panes.map((p) => (p.app ? { app: p.app } : { cwd: p.cwd, effort: p.effort, model: p.model })));
 }
 
-// Pick a column count that keeps the panes close to square-ish.
+// How the panes are arranged (chosen in the Layout menu). "grid" picks a
+// column count that keeps the panes close to square-ish; the "main" ones give
+// the first pane most of the space and line the rest up beside or below it.
+let layoutKind = 'grid';
+
 function layout() {
   const visible = enlarged ? [enlarged] : panes;
   const n = visible.length;
-  const cols = n <= 1 ? 1 : n <= 2 ? 2 : n <= 4 ? 2 : n <= 6 ? 3 : Math.ceil(Math.sqrt(n));
-  const rows = Math.max(1, Math.ceil(n / cols));
-  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-  grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+  const kind = n < 2 ? 'grid' : layoutKind;
+  let cols, rows;
+  panes.forEach((p) => (p.el.style.gridRow = p.el.style.gridColumn = ''));
+  if (kind === 'columns') {
+    [cols, rows] = [`repeat(${n}, 1fr)`, '1fr'];
+  } else if (kind === 'rows') {
+    [cols, rows] = ['1fr', `repeat(${n}, 1fr)`];
+  } else if (kind === 'main-left') {
+    [cols, rows] = ['2fr 1fr', `repeat(${n - 1}, 1fr)`];
+    visible[0].el.style.gridRow = '1 / -1';
+  } else if (kind === 'main-top') {
+    [cols, rows] = [`repeat(${n - 1}, 1fr)`, '2fr 1fr'];
+    visible[0].el.style.gridColumn = '1 / -1';
+  } else {
+    const c = n <= 1 ? 1 : n <= 2 ? 2 : n <= 4 ? 2 : n <= 6 ? 3 : Math.ceil(Math.sqrt(n));
+    [cols, rows] = [`repeat(${c}, 1fr)`, `repeat(${Math.max(1, Math.ceil(n / c))}, 1fr)`];
+  }
+  grid.style.gridTemplateColumns = cols;
+  grid.style.gridTemplateRows = rows;
 
   panes.forEach((p, i) => {
     p.el.classList.toggle('hidden', !!enlarged && p !== enlarged);
@@ -426,10 +452,11 @@ setInterval(() => renderUsage({}), 60 * 1000); // so passed reset times show up
 const bgVideo = document.getElementById('bg-video');
 const bgPanel = document.getElementById('bg-panel');
 const bgOpacity = document.getElementById('bg-opacity');
+const bgAppOpacity = document.getElementById('bg-app-opacity');
 const bgSound = document.getElementById('bg-sound');
 const bgVolume = document.getElementById('bg-volume');
 const bgAutoNext = document.getElementById('bg-auto-next');
-let background = { path: null, url: null, opacity: 70, muted: true, volume: 30 };
+let background = { path: null, url: null, opacity: 70, appOpacity: 85, muted: true, volume: 30 };
 
 function applyBackground() {
   const playing = !!background.url;
@@ -450,6 +477,8 @@ function applyBackground() {
   document.getElementById('bg-volume-value').textContent = `${background.volume}%`;
   bgOpacity.value = background.opacity;
   document.getElementById('bg-opacity-value').textContent = `${background.opacity}%`;
+  bgAppOpacity.value = background.appOpacity;
+  document.getElementById('bg-app-opacity-value').textContent = `${background.appOpacity}%`;
   document.getElementById('bg-remove').disabled = !playing;
   bgAutoNext.checked = !!background.autoNext;
   renderLibrary();
@@ -561,6 +590,11 @@ bgOpacity.addEventListener('input', () => {
   applyBackground();
 });
 bgOpacity.addEventListener('change', saveBackground);
+bgAppOpacity.addEventListener('input', () => {
+  background.appOpacity = Number(bgAppOpacity.value);
+  applyBackground();
+});
+bgAppOpacity.addEventListener('change', saveBackground);
 // Turning the volume up also turns the sound on, so the slider does what it looks like.
 bgVolume.addEventListener('input', () => {
   background.volume = Number(bgVolume.value);
@@ -638,7 +672,7 @@ bgVideo.addEventListener('error', () => {
 
 Promise.all([window.api.loadBackground(), window.api.listLibrary()]).then(([saved, videos]) => {
   library = videos;
-  background = { ...background, ...saved, opacity: saved?.opacity ?? background.opacity, muted: saved?.muted ?? true, volume: saved?.volume ?? background.volume };
+  background = { ...background, ...saved, opacity: saved?.opacity ?? background.opacity, appOpacity: saved?.appOpacity ?? background.appOpacity, muted: saved?.muted ?? true, volume: saved?.volume ?? background.volume };
   applyBackground();
 });
 
@@ -731,7 +765,9 @@ window.api.isMaximized().then(showMaximized);
 document.getElementById('keys-close').addEventListener('click', () => toggleKeys(false));
 // Programs pulled in from outside sit on top of everything in the window, so
 // they're hidden while a menu or the commands sheet is open.
-const APP_NAMES = { chatgpt: 'ChatGPT', obsidian: 'Obsidian' };
+const APP_NAMES = { chatgpt: 'ChatGPT', obsidian: 'Obsidian', edge: 'Microsoft Edge' };
+// faded by the "ChatGPT and Obsidian opacity" slider while a background plays
+const SEE_THROUGH_APPS = ['chatgpt', 'obsidian'];
 
 function createAppPane(app) {
   const id = `pane-${nextId++}`;
@@ -768,6 +804,7 @@ async function attachApp(p) {
   if (p.attached) window.api.releaseApp(p.id);
   p.attached = false;
   p.lastPlace = null;
+  p.lastOpacity = null;
   p.el.querySelector('.app-msg').textContent = `Looking for ${APP_NAMES[p.app]}…`;
   setStatus(p, '');
   const res = await window.api.attachApp(p.id, p.app);
@@ -785,7 +822,7 @@ async function attachApp(p) {
 
 // Tell the main process where each pulled-in window goes, in screen pixels.
 function placeApps() {
-  const covered = [keysSheet, bgPanel, aboutPanel, setupSheet].some((el) => el.classList.contains('open'));
+  const covered = [keysSheet, bgPanel, aboutPanel, setupSheet, layoutPanel].some((el) => el.classList.contains('open'));
   const scale = window.devicePixelRatio;
   for (const p of panes) {
     if (!p.attached) continue;
@@ -793,9 +830,16 @@ function placeApps() {
     const r = p.body.getBoundingClientRect();
     const rect = { x: Math.round(r.left * scale), y: Math.round(r.top * scale), width: Math.round(r.width * scale), height: Math.round(r.height * scale) };
     const key = JSON.stringify([rect, visible]);
-    if (key === p.lastPlace) continue;
-    p.lastPlace = key;
-    window.api.placeApp(p.id, rect, visible);
+    if (key !== p.lastPlace) {
+      p.lastPlace = key;
+      window.api.placeApp(p.id, rect, visible);
+    }
+    // see-through over a background video, like the terminals
+    const alpha = SEE_THROUGH_APPS.includes(p.app) && background.url ? background.appOpacity : 100;
+    if (alpha !== p.lastOpacity) {
+      p.lastOpacity = alpha;
+      window.api.setAppOpacity(p.id, alpha);
+    }
   }
 }
 // cheap catch-all for anything that moves a pane (layout, window resizing, menus)
@@ -941,9 +985,48 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+// Layout menu: how the panes are arranged, and moving the selected pane.
+const layoutPanel = document.getElementById('layout-panel');
+const layoutButtons = document.querySelectorAll('#layout-options button');
+
+function showLayout() {
+  layoutButtons.forEach((b) => b.classList.toggle('current', b.dataset.layout === layoutKind));
+}
+
+function setLayout(kind) {
+  layoutKind = kind;
+  enlarged = null;
+  showLayout();
+  window.api.saveLayout(kind);
+  layout();
+}
+
+// Put the selected pane at position `to` (0 = pane 1).
+function movePane(p, to) {
+  const from = panes.indexOf(p);
+  if (from < 0 || to < 0 || to >= panes.length || to === from) return;
+  panes.splice(from, 1);
+  panes.splice(to, 0, p);
+  grid.insertBefore(p.el, panes[to + 1]?.el || null);
+  save();
+  layout();
+  setFocus(p);
+}
+
+document.getElementById('layout-btn').addEventListener('click', () => layoutPanel.classList.toggle('open'));
+layoutButtons.forEach((b) => b.addEventListener('click', () => setLayout(b.dataset.layout)));
+document.getElementById('layout-move-left').addEventListener('click', () => focused && movePane(focused, panes.indexOf(focused) - 1));
+document.getElementById('layout-move-right').addEventListener('click', () => focused && movePane(focused, panes.indexOf(focused) + 1));
+document.getElementById('layout-make-main').addEventListener('click', () => focused && movePane(focused, 0));
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('#layout-menu')) layoutPanel.classList.remove('open');
+});
+
 // Reopen the folders from last time.
 (async () => {
   checkSetup();
+  layoutKind = await window.api.loadLayout();
+  showLayout();
   const saved = await window.api.loadPanes();
   // (skips programs no longer offered)
   saved.filter((s) => !s.app || APP_NAMES[s.app]).forEach((s) => (s.app ? createAppPane(s.app) : createPane(s.cwd, s.effort || '', s.model || '')));

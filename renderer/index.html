@@ -35,8 +35,28 @@
     <div id="app-btns">
       <button data-app="chatgpt" class="icon-btn" title="ChatGPT: pull its window into a pane (it opens it if needed)"><span class="logo logo-chatgpt"></span></button>
       <button data-app="obsidian" class="icon-btn" title="Obsidian: pull its window into a pane (it opens it if needed)"><span class="logo logo-obsidian"></span></button>
+      <button data-app="edge" class="icon-btn" title="Microsoft Edge: pull a window into a pane (it opens a new one if needed)"><span class="logo logo-edge"></span></button>
     </div>
     <span class="sep"></span>
+    <div id="layout-menu">
+      <button id="layout-btn" class="icon-btn" title="Layout: how the panes are arranged"><i data-icon="layoutGrid"></i></button>
+      <div id="layout-panel">
+        <div id="layout-options">
+          <button data-layout="grid" title="Auto grid"><i data-icon="layoutGrid"></i>Grid</button>
+          <button data-layout="columns" title="All side by side"><i data-icon="layoutColumns"></i>Side by side</button>
+          <button data-layout="rows" title="All stacked on top of each other"><i data-icon="layoutRows"></i>Stacked</button>
+          <button data-layout="main-left" title="Pane 1 big on the left, the rest down the right"><i data-icon="layoutMainLeft"></i>Big left</button>
+          <button data-layout="main-top" title="Pane 1 big on top, the rest along the bottom"><i data-icon="layoutMainTop"></i>Big top</button>
+        </div>
+        <p class="bg-note">Big left and Big top give pane 1 the most room.</p>
+        <span class="layout-label">Selected pane</span>
+        <div class="bg-row">
+          <button id="layout-move-left" title="Swap the selected pane with the one before it"><i data-icon="moveLeft"></i>Move back</button>
+          <button id="layout-move-right" title="Swap the selected pane with the one after it"><i data-icon="moveRight"></i>Move on</button>
+        </div>
+        <button id="layout-make-main" title="Move the selected pane to pane 1">Make it pane 1</button>
+      </div>
+    </div>
     <div id="bg-menu">
       <button id="bg-btn" class="icon-btn" title="Background video"><i data-icon="image"></i></button>
       <button id="bg-sound" class="icon-btn" title="Turn the background video's sound on or off"></button>
@@ -64,6 +84,11 @@
           <input id="bg-opacity" type="range" min="20" max="100" step="5" />
         </label>
         <p class="bg-note">Lower lets more of the video show through the terminals.</p>
+        <label>
+          ChatGPT and Obsidian opacity <span id="bg-app-opacity-value"></span>
+          <input id="bg-app-opacity" type="range" min="30" max="100" step="5" />
+        </label>
+        <p class="bg-note">Fades their whole window, text included.</p>
         <label>
           Play from <span id="bg-start-value"></span>
           <input id="bg-start" type="range" min="0" step="0.5" />

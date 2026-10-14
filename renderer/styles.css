@@ -112,7 +112,7 @@ button.icon-btn {
   justify-content: center;
 }
 
-/* ChatGPT and Obsidian logos, drawn in the text colour */
+/* ChatGPT, Obsidian and Edge logos, drawn in the text colour */
 .logo {
   display: inline-block;
   width: 15px;
@@ -128,6 +128,10 @@ button.icon-btn {
 
 .logo-obsidian {
   --logo: url('icons/obsidian.svg');
+}
+
+.logo-edge {
+  --logo: url('icons/edge.svg');
 }
 
 input[type='text'] {
@@ -184,6 +188,7 @@ input[type='checkbox'] {
 #toolbar input,
 #bg-menu,
 #about-menu,
+#layout-menu,
 #usage {
   -webkit-app-region: no-drag;
 }
@@ -601,6 +606,7 @@ input[type='checkbox'] {
 }
 
 /* a floating panel under the top bar */
+#layout-panel,
 #bg-panel,
 #about-panel,
 #setup-box,
@@ -626,6 +632,61 @@ input[type='checkbox'] {
 
 #bg-panel.open {
   display: flex;
+}
+
+/* ---------- layout menu ---------- */
+
+#layout-menu {
+  position: relative;
+  display: flex;
+}
+
+#layout-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: 280px;
+  padding: 14px;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 10;
+}
+
+#layout-panel.open {
+  display: flex;
+}
+
+#layout-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+#layout-options button {
+  gap: 8px;
+  border-color: transparent;
+  color: var(--muted);
+}
+
+#layout-options button:hover {
+  color: var(--text);
+}
+
+#layout-options button.current {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.35);
+}
+
+.layout-label {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: #bdbdbd;
+}
+
+#layout-make-main {
+  justify-content: center;
 }
 
 #bg-panel label {

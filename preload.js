@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('api', {
   loadPanes: () => ipcRenderer.invoke('panes:load'),
   savePanes: (panes) => ipcRenderer.invoke('panes:save', panes),
+  loadLayout: () => ipcRenderer.invoke('layout:load'),
+  saveLayout: (layout) => ipcRenderer.invoke('layout:save', layout),
   pickFolder: () => ipcRenderer.invoke('folder:pick'),
   listLibrary: () => ipcRenderer.invoke('library:list'),
   importVideos: () => ipcRenderer.invoke('library:import'),
@@ -27,6 +29,7 @@ contextBridge.exposeInMainWorld('api', {
   attachApp: (id, app) => ipcRenderer.invoke('app:attach', id, app),
   placeApp: (id, rect, visible) => ipcRenderer.send('app:place', id, rect, visible),
   focusApp: (id) => ipcRenderer.send('app:focus', id),
+  setAppOpacity: (id, percent) => ipcRenderer.send('app:opacity', id, percent),
   releaseApp: (id) => ipcRenderer.send('app:release', id),
   onAppStatus: (cb) => ipcRenderer.on('app:status', (_e, id, status) => cb(id, status)),
   onAppCheck: (cb) => ipcRenderer.on('app:check', (_e, gone, titles) => cb(gone, titles)),

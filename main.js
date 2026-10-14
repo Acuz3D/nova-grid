@@ -167,6 +167,7 @@ ipcMain.handle('app:attach', (_e, id, appKey) =>
 );
 ipcMain.on('app:place', (_e, id, rect, visible) => embed.place(id, rect, visible));
 ipcMain.on('app:focus', (_e, id) => embed.focus(id));
+ipcMain.on('app:opacity', (_e, id, percent) => embed.opacity(id, percent));
 ipcMain.on('app:release', (_e, id) => embed.release(id));
 setInterval(() => {
   const { gone, titles } = embed.check();
@@ -175,12 +176,14 @@ setInterval(() => {
 
 ipcMain.handle('panes:load', () => loadConfig().panes || []);
 ipcMain.handle('panes:save', (_e, panes) => saveConfig({ panes }));
+ipcMain.handle('layout:load', () => loadConfig().layout || 'grid');
+ipcMain.handle('layout:save', (_e, layout) => saveConfig({ layout }));
 
 ipcMain.handle('background:load', () => withUrl(loadConfig().background));
 ipcMain.handle('background:save', (_e, background) => {
   // loops: each library video's own "play from / until", keyed by file name
-  const { path: file, opacity, muted, volume, start, end, loops, autoNext } = background;
-  saveConfig({ background: { path: file, opacity, muted, volume, start, end, loops, autoNext } });
+  const { path: file, opacity, appOpacity, muted, volume, start, end, loops, autoNext } = background;
+  saveConfig({ background: { path: file, opacity, appOpacity, muted, volume, start, end, loops, autoNext } });
   return withUrl(background);
 });
 

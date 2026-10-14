@@ -1,4 +1,4 @@
-// Pulls other programs' windows (ChatGPT, Obsidian)
+// Pulls other programs' windows (ChatGPT, Obsidian, Microsoft Edge)
 // into Nova Grid panes. Windows doesn't properly support this: the program's
 // window is made a child of Nova Grid's window, which mostly works but can
 // glitch. Windows are always handed back before Nova Grid closes, because
@@ -37,6 +37,7 @@ const w = {
   SetWindowPos: user32.func('bool __stdcall SetWindowPos(intptr_t hwnd, intptr_t after, int x, int y, int cx, int cy, uint32 flags)'),
   ShowWindow: user32.func('bool __stdcall ShowWindow(intptr_t hwnd, int cmd)'),
   SetFocus: user32.func('intptr_t __stdcall SetFocus(intptr_t hwnd)'),
+  SetLayeredWindowAttributes: user32.func('bool __stdcall SetLayeredWindowAttributes(intptr_t hwnd, uint32 key, uint8 alpha, uint32 flags)'),
   OpenProcess: kernel32.func('intptr_t __stdcall OpenProcess(uint32 access, bool inherit, uint32 pid)'),
   QueryFullProcessImageNameW: kernel32.func('bool __stdcall QueryFullProcessImageNameW(intptr_t proc, uint32 flags, uint8 *buf, _Inout_ uint32 *size)'),
   CloseHandle: kernel32.func('bool __stdcall CloseHandle(intptr_t h)'),
@@ -50,6 +51,8 @@ const WS_POPUP = 0x80000000 | 0;
 const WS_FRAME = 0x00c00000 | 0x00040000 | 0x00080000 | 0x00020000 | 0x00010000; // caption, sizing border, system menu, min/max
 const WS_EX_APPWINDOW = 0x00040000;
 const WS_EX_TOPMOST = 0x00000008;
+const WS_EX_LAYERED = 0x00080000;
+const LWA_ALPHA = 0x2;
 const SWP_NOACTIVATE = 0x10;
 const SWP_FRAMECHANGED = 0x20;
 const SWP_SHOWWINDOW = 0x40;
@@ -60,11 +63,14 @@ const SW_RESTORE = 9;
 const SW_SHOW = 5;
 
 // exe: the program's file name. startName: its name in the Start menu, used to launch it.
-// Both have a single main window, so opening them again never gives a second one.
-// (Blender and Roblox Studio were tried too, but stay blank inside the pane.)
+// ChatGPT and Obsidian have a single main window, so opening them again never
+// gives a second one. Edge opens a new window each time (multiWindow), so each
+// Edge pane can have its own. (Blender and Roblox Studio were tried too, but
+// stay blank inside the pane.)
 const APPS = {
   chatgpt: { name: 'ChatGPT', exe: 'chatgpt.exe', startName: /^ChatGPT$/ },
   obsidian: { name: 'Obsidian', exe: 'obsidian.exe', startName: /^Obsidian$/ },
+  edge: { name: 'Microsoft Edge', exe: 'msedge.exe', startName: /^Microsoft Edge$/, multiWindow: true },
 };
 
 const embedded = new Map(); // pane id -> { hwnd, style, exStyle, rect, shown }
@@ -139,11 +145,20 @@ function launch(app) {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function attach(id, appKey, parentHwnd, onStatus) {
+// One at a time: panes reopened together would otherwise all find the same
+// window before any of them has taken it.
+let queue = Promise.resolve();
+function attach(...args) {
+  const run = queue.then(() => attachNow(...args));
+  queue = run.catch(() => {});
+  return run;
+}
+
+async function attachNow(id, appKey, parentHwnd, onStatus) {
   const app = APPS[appKey];
   if (!app) return { error: 'Unknown app' };
   let hwnd = findWindow(app.exe);
-  if (!hwnd && [...embedded.values()].some((e) => e.exe === app.exe)) {
+  if (!hwnd && !app.multiWindow && [...embedded.values()].some((e) => e.exe === app.exe)) {
     return { error: `${app.name} is already in another pane` };
   }
   if (!hwnd) {
@@ -188,6 +203,21 @@ function place(id, rect, visible) {
   e.shown = true;
 }
 
+// See-through: the whole window (text too) is faded so the background video
+// shows. 100 = solid. Undone in release() when the old styles go back.
+function opacity(id, percent) {
+  const e = embedded.get(id);
+  if (!e || e.opacity === percent) return;
+  e.opacity = percent;
+  const exStyle = Number(w.GetWindowLongPtrW(e.hwnd, GWL_EXSTYLE)) | 0;
+  if (percent >= 100) {
+    w.SetWindowLongPtrW(e.hwnd, GWL_EXSTYLE, exStyle & ~WS_EX_LAYERED);
+    return;
+  }
+  w.SetWindowLongPtrW(e.hwnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
+  w.SetLayeredWindowAttributes(e.hwnd, 0, Math.round((percent / 100) * 255), LWA_ALPHA);
+}
+
 function focus(id) {
   const e = embedded.get(id);
   if (e) w.SetFocus(e.hwnd);
@@ -227,4 +257,4 @@ function check() {
   return { gone, titles };
 }
 
-module.exports = { APPS, attach, place, focus, release, releaseAll, check };
+module.exports = { APPS, attach, place, opacity, focus, release, releaseAll, check };
