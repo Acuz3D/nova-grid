@@ -44,6 +44,7 @@ const w = {
   SetForegroundWindow: user32.func('bool __stdcall SetForegroundWindow(intptr_t hwnd)'),
   ClientToScreen: user32.func('bool __stdcall ClientToScreen(intptr_t hwnd, _Inout_ POINT *pt)'),
   SetLayeredWindowAttributes: user32.func('bool __stdcall SetLayeredWindowAttributes(intptr_t hwnd, uint32 key, uint8 alpha, uint32 flags)'),
+  PostMessageW: user32.func('bool __stdcall PostMessageW(intptr_t hwnd, uint32 msg, uintptr_t wParam, intptr_t lParam)'),
   OpenProcess: kernel32.func('intptr_t __stdcall OpenProcess(uint32 access, bool inherit, uint32 pid)'),
   QueryFullProcessImageNameW: kernel32.func('bool __stdcall QueryFullProcessImageNameW(intptr_t proc, uint32 flags, uint8 *buf, _Inout_ uint32 *size)'),
   CloseHandle: kernel32.func('bool __stdcall CloseHandle(intptr_t h)'),
@@ -70,16 +71,18 @@ const SW_HIDE = 0;
 const SW_SHOWNA = 8;
 const SW_RESTORE = 9;
 const SW_SHOW = 5;
+const WM_CLOSE = 0x0010;
 
 // exe: the program's file name. startName: its name in the Start menu, used to launch it.
 // ChatGPT and Obsidian have a single main window, so opening them again never
 // gives a second one. Edge opens a new window each time (multiWindow), so each
-// Edge pane can have its own. (Blender and Roblox Studio were tried too, but
-// stay blank inside the pane.)
+// Edge pane can have its own, and closing the pane closes its window
+// (closeWithPane). (Blender and Roblox Studio were tried too, but stay blank
+// inside the pane.)
 const APPS = {
   chatgpt: { name: 'ChatGPT', exe: 'chatgpt.exe', startName: /^ChatGPT$/ },
   obsidian: { name: 'Obsidian', exe: 'obsidian.exe', startName: /^Obsidian$/ },
-  edge: { name: 'Microsoft Edge', exe: 'msedge.exe', startName: /^Microsoft Edge$/, multiWindow: true },
+  edge: { name: 'Microsoft Edge', exe: 'msedge.exe', startName: /^Microsoft Edge$/, multiWindow: true, closeWithPane: true },
 };
 
 const embedded = new Map(); // pane id -> { hwnd, parent, style, exStyle, rect, at, shown, floating, opacity }
@@ -195,7 +198,7 @@ async function attachNow(id, appKey, parentHwnd, onStatus) {
     w.ShowWindow(hwnd, SW_SHOW);
     return { error: `Windows wouldn't let ${app.name} be moved inside` };
   }
-  embedded.set(id, { hwnd, parent: parentHwnd, exe: app.exe, style, exStyle, rect, shown: false, floating: false });
+  embedded.set(id, { hwnd, parent: parentHwnd, exe: app.exe, closeWithPane: !!app.closeWithPane, style, exStyle, rect, shown: false, floating: false });
   return { title: title(hwnd) };
 }
 
@@ -274,19 +277,38 @@ function focus(id) {
 }
 
 // Give the window back as it was: own frame, own taskbar button, old position.
-function release(id) {
-  const e = embedded.get(id);
-  if (!e) return;
-  embedded.delete(id);
-  if (!w.IsWindow(e.hwnd)) return;
+function giveBack(e, show) {
   w.ShowWindow(e.hwnd, SW_HIDE);
   w.SetParent(e.hwnd, 0);
   w.SetWindowLongPtrW(e.hwnd, GWLP_HWNDPARENT, 0);
   w.SetWindowLongPtrW(e.hwnd, GWL_STYLE, e.style);
   w.SetWindowLongPtrW(e.hwnd, GWL_EXSTYLE, e.exStyle);
   const r = e.rect;
-  w.SetWindowPos(e.hwnd, 0, r.left, r.top, r.right - r.left, r.bottom - r.top, SWP_NOZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
-  w.ShowWindow(e.hwnd, SW_SHOW);
+  w.SetWindowPos(e.hwnd, 0, r.left, r.top, r.right - r.left, r.bottom - r.top, SWP_NOZORDER | SWP_FRAMECHANGED | (show ? SWP_SHOWWINDOW : 0));
+  if (show) w.ShowWindow(e.hwnd, SW_SHOW);
+}
+
+function release(id) {
+  const e = embedded.get(id);
+  if (!e) return;
+  embedded.delete(id);
+  if (w.IsWindow(e.hwnd)) giveBack(e, true);
+}
+
+// The pane's close button: closes the window for programs with
+// closeWithPane (Edge), and gives it back for the rest. The window is given
+// back hidden first, so if Edge asks "close all tabs?" it can be shown again
+// to answer.
+function close(id) {
+  const e = embedded.get(id);
+  if (!e?.closeWithPane) return release(id);
+  embedded.delete(id);
+  if (!w.IsWindow(e.hwnd)) return;
+  giveBack(e, false);
+  w.PostMessageW(e.hwnd, WM_CLOSE, 0, 0);
+  setTimeout(() => {
+    if (w.IsWindow(e.hwnd) && !w.IsWindowVisible(e.hwnd)) w.ShowWindow(e.hwnd, SW_SHOW);
+  }, 1500);
 }
 
 function releaseAll() {
@@ -308,4 +330,4 @@ function check() {
   return { gone, titles };
 }
 
-module.exports = { APPS, attach, place, follow, opacity, focus, release, releaseAll, check };
+module.exports = { APPS, attach, place, follow, opacity, focus, release, close, releaseAll, check };

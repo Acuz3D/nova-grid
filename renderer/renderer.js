@@ -50,34 +50,212 @@ function save() {
   window.api.savePanes(panes.map((p) => (p.app ? { app: p.app } : { cwd: p.cwd, effort: p.effort, model: p.model })));
 }
 
-// How the panes are arranged (chosen in the Layout menu). "grid" picks a
-// column count that keeps the panes close to square-ish; the "main" ones give
-// the first pane most of the space and line the rest up beside or below it.
+// How the panes are arranged (chosen in the Layout menu). Panes sit in
+// groups: rows stacked top to bottom, or columns side by side. "grid" picks a
+// row length that keeps the panes close to square-ish, and the last row's
+// panes stretch to fill it; the "main" ones give the first pane most of the
+// space and line the rest up beside or below it.
 let layoutKind = 'grid';
+
+function arrangement(n, kind) {
+  const all = [...Array(n).keys()];
+  if (n < 2 || kind === 'columns') return { stacked: true, groups: [all] };
+  if (kind === 'rows') return { stacked: true, groups: all.map((i) => [i]) };
+  if (kind === 'main-left') return { stacked: false, groups: [[0], all.slice(1)], weights: [2, 1] };
+  if (kind === 'main-top') return { stacked: true, groups: [[0], all.slice(1)], weights: [2, 1] };
+  const perRow = n <= 4 ? 2 : n <= 6 ? 3 : Math.ceil(Math.sqrt(n));
+  const groups = [];
+  for (let i = 0; i < n; i += perRow) groups.push(all.slice(i, i + perRow));
+  return { stacked: true, groups };
+}
+
+// Sizes set by dragging the gaps between panes, remembered for each layout
+// and number of panes: { outer: [weight per group], inner: [[weight per pane]] }.
+let paneSizes = JSON.parse(localStorage.getItem('paneSizes') || '{}');
+const GAP = 8; // space around and between panes, which is also what you drag
+const MIN_SIZE = { x: 220, y: 110 }; // smallest a pane can be dragged to
+
+function sizesFor(key, a) {
+  const s = paneSizes[key];
+  const fits = s && s.outer.length === a.groups.length && a.groups.every((g, i) => s.inner[i]?.length === g.length);
+  if (!fits) paneSizes[key] = { outer: a.weights || a.groups.map(() => 1), inner: a.groups.map((g) => g.map(() => 1)) };
+  return paneSizes[key];
+}
+
+// Shares out `total` pixels by weight, with GAP between each share.
+function split(total, weights) {
+  const free = total - GAP * (weights.length - 1);
+  const sum = weights.reduce((a, b) => a + b, 0);
+  let before = 0;
+  return weights.map((w, i) => {
+    const pos = Math.round((before / sum) * free) + i * GAP;
+    before += w;
+    return { pos, size: Math.round((before / sum) * free) + i * GAP - pos };
+  });
+}
+
+// Puts each visible pane and the dividers between them in place.
+function arrange() {
+  const visible = enlarged ? [enlarged] : panes;
+  const kind = visible.length < 2 ? 'grid' : layoutKind;
+  const a = arrangement(visible.length, kind);
+  const key = `${kind}:${a.groups.map((g) => g.length).join('-')}`;
+  const s = sizesFor(key, a);
+  const width = grid.clientWidth - 2 * GAP;
+  const height = grid.clientHeight - 2 * GAP;
+  const [outerLength, innerLength] = a.stacked ? [height, width] : [width, height];
+  const box = (outerPos, outerSize, innerPos, innerSize) =>
+    a.stacked
+      ? { x: GAP + innerPos, y: GAP + outerPos, w: innerSize, h: outerSize }
+      : { x: GAP + outerPos, y: GAP + innerPos, w: outerSize, h: innerSize };
+
+  const dividers = [];
+  const outer = split(outerLength, s.outer);
+  a.groups.forEach((group, gi) => {
+    const o = outer[gi];
+    if (gi > 0) {
+      const prev = outer[gi - 1];
+      dividers.push({ key, weights: s.outer, i: gi - 1, axis: a.stacked ? 'y' : 'x', px: [prev.size, o.size], ...box(prev.pos + prev.size, GAP, 0, innerLength) });
+    }
+    const inner = split(innerLength, s.inner[gi]);
+    group.forEach((pi, j) => {
+      const n = inner[j];
+      const r = box(o.pos, o.size, n.pos, n.size);
+      Object.assign(visible[pi].el.style, { left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` });
+      if (j > 0) {
+        const prev = inner[j - 1];
+        dividers.push({ key, weights: s.inner[gi], i: j - 1, axis: a.stacked ? 'x' : 'y', px: [prev.size, n.size], ...box(o.pos, o.size, prev.pos + prev.size, GAP) });
+      }
+    });
+  });
+  placeDividers(dividers);
+  placeApps();
+}
+
+// The divider elements are reused, so one being dragged stays the same element.
+const dividerEls = [];
+
+function placeDividers(list) {
+  while (dividerEls.length < list.length) {
+    const el = document.createElement('div');
+    el.title = 'Drag to resize. Double-click to make them even again';
+    el.addEventListener('pointerdown', (e) => startResize(e, el));
+    el.addEventListener('dblclick', () => {
+      delete paneSizes[el.info.key];
+      localStorage.setItem('paneSizes', JSON.stringify(paneSizes));
+      layout();
+    });
+    grid.appendChild(el);
+    dividerEls.push(el);
+  }
+  dividerEls.forEach((el, i) => {
+    const d = list[i];
+    el.hidden = !d;
+    if (!d) return;
+    el.info = d;
+    el.className = `divider drag-${d.axis}${el.classList.contains('active') ? ' active' : ''}`;
+    Object.assign(el.style, { left: `${d.x}px`, top: `${d.y}px`, width: `${d.w}px`, height: `${d.h}px` });
+  });
+}
+
+// While a divider is dragged, terminals aren't refitted (Claude would redraw
+// for every pixel); they catch up when it's let go.
+let resizing = false;
+
+function startResize(e, el) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  const { weights, i, axis, px } = el.info;
+  const [a, b] = px;
+  const [wa, wb] = [weights[i], weights[i + 1]];
+  const min = MIN_SIZE[axis];
+  const from = axis === 'x' ? e.clientX : e.clientY;
+  el.setPointerCapture(e.pointerId);
+  el.classList.add('active');
+  document.body.classList.add(`resizing-${axis}`);
+  resizing = true;
+
+  const move = (ev) => {
+    if (a + b < 2 * min) return; // already too small to share out
+    const d = Math.max(min - a, Math.min(b - min, (axis === 'x' ? ev.clientX : ev.clientY) - from));
+    weights[i] = ((wa + wb) * (a + d)) / (a + b);
+    weights[i + 1] = wa + wb - weights[i];
+    arrange();
+  };
+  const end = () => {
+    el.removeEventListener('pointermove', move);
+    el.removeEventListener('pointerup', end);
+    el.removeEventListener('pointercancel', end);
+    el.classList.remove('active');
+    document.body.classList.remove(`resizing-${axis}`);
+    resizing = false;
+    localStorage.setItem('paneSizes', JSON.stringify(paneSizes));
+    layout();
+  };
+  el.addEventListener('pointermove', move);
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+}
+
+// Dragging a pane by its title bar onto another pane swaps the two.
+let movingPane = null;
+
+function startMove(e, p) {
+  if (e.button !== 0 || e.target.closest('button, select')) return;
+  const header = e.currentTarget;
+  const [x0, y0] = [e.clientX, e.clientY];
+  let target = null;
+  header.setPointerCapture(e.pointerId);
+
+  const setTarget = (q) => {
+    if (q === target) return;
+    target?.el.classList.remove('drop-target');
+    target = q;
+    target?.el.classList.add('drop-target');
+  };
+  const move = (ev) => {
+    if (!movingPane) {
+      if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return; // just a click
+      movingPane = p;
+      p.el.classList.add('moving');
+      document.body.classList.add('moving-pane');
+      placeApps(); // programs in panes would cover the drop highlight
+    }
+    const over = panes.find((q) => {
+      if (q === p || q.el.classList.contains('hidden')) return false;
+      const r = q.el.getBoundingClientRect();
+      return ev.clientX >= r.left && ev.clientX < r.right && ev.clientY >= r.top && ev.clientY < r.bottom;
+    });
+    setTarget(over || null);
+  };
+  const end = () => {
+    header.removeEventListener('pointermove', move);
+    header.removeEventListener('pointerup', end);
+    header.removeEventListener('pointercancel', end);
+    if (!movingPane) return;
+    const over = target;
+    setTarget(null);
+    movingPane = null;
+    p.el.classList.remove('moving');
+    document.body.classList.remove('moving-pane');
+    if (over) swapPanes(p, over);
+    else placeApps();
+  };
+  header.addEventListener('pointermove', move);
+  header.addEventListener('pointerup', end);
+  header.addEventListener('pointercancel', end);
+}
+
+function swapPanes(a, b) {
+  const [i, j] = [panes.indexOf(a), panes.indexOf(b)];
+  [panes[i], panes[j]] = [panes[j], panes[i]];
+  save();
+  layout();
+  setFocus(a);
+}
 
 function layout() {
   const visible = enlarged ? [enlarged] : panes;
-  const n = visible.length;
-  const kind = n < 2 ? 'grid' : layoutKind;
-  let cols, rows;
-  panes.forEach((p) => (p.el.style.gridRow = p.el.style.gridColumn = ''));
-  if (kind === 'columns') {
-    [cols, rows] = [`repeat(${n}, 1fr)`, '1fr'];
-  } else if (kind === 'rows') {
-    [cols, rows] = ['1fr', `repeat(${n}, 1fr)`];
-  } else if (kind === 'main-left') {
-    [cols, rows] = ['2fr 1fr', `repeat(${n - 1}, 1fr)`];
-    visible[0].el.style.gridRow = '1 / -1';
-  } else if (kind === 'main-top') {
-    [cols, rows] = [`repeat(${n - 1}, 1fr)`, '2fr 1fr'];
-    visible[0].el.style.gridColumn = '1 / -1';
-  } else {
-    const c = n <= 1 ? 1 : n <= 2 ? 2 : n <= 4 ? 2 : n <= 6 ? 3 : Math.ceil(Math.sqrt(n));
-    [cols, rows] = [`repeat(${c}, 1fr)`, `repeat(${Math.max(1, Math.ceil(n / c))}, 1fr)`];
-  }
-  grid.style.gridTemplateColumns = cols;
-  grid.style.gridTemplateRows = rows;
-
   panes.forEach((p, i) => {
     p.el.classList.toggle('hidden', !!enlarged && p !== enlarged);
     p.el.querySelector('.pane-num').textContent = i < 9 ? `${i + 1}` : '';
@@ -85,12 +263,15 @@ function layout() {
 
   empty.classList.toggle('show', panes.length === 0);
   count.textContent = panes.length ? `${panes.length} open` : '';
+  arrange();
   visible.forEach(fitPane);
-  placeApps();
 }
 
+// Window resized: same arrangement, new size.
+new ResizeObserver(() => arrange()).observe(grid);
+
 function fitPane(p) {
-  if (p.app || p.el.classList.contains('hidden')) return;
+  if (resizing || p.app || p.el.classList.contains('hidden')) return;
   try {
     p.fit.fit();
   } catch {}
@@ -171,7 +352,7 @@ function createPane(cwd, effort = '', model = '') {
   const el = document.createElement('section');
   el.className = 'pane';
   el.innerHTML = `
-    <div class="pane-header" title="Double-click to enlarge / shrink">
+    <div class="pane-header" title="Drag onto another pane to swap them. Double-click to enlarge / shrink">
       <span class="pane-num"></span>
       <span class="pane-title"></span>
       <span class="pane-path"></span>
@@ -227,6 +408,7 @@ function createPane(cwd, effort = '', model = '') {
   el.addEventListener('mousedown', () => setFocus(p));
 
   const header = el.querySelector('.pane-header');
+  header.addEventListener('pointerdown', (e) => startMove(e, p));
   header.addEventListener('dblclick', (e) => {
     if (e.target.tagName !== 'BUTTON') toggleEnlarge(p);
   });
@@ -291,7 +473,7 @@ function restartPane(p, resume = false) {
 }
 
 function closePane(p) {
-  if (p.app) window.api.releaseApp(p.id);
+  if (p.app) window.api.closeApp(p.id);
   else {
     window.api.kill(p.id);
     p.running = false;
@@ -768,20 +950,22 @@ document.getElementById('keys-close').addEventListener('click', () => toggleKeys
 const APP_NAMES = { chatgpt: 'ChatGPT', obsidian: 'Obsidian', edge: 'Microsoft Edge' };
 // faded by the "ChatGPT, Obsidian and Edge opacity" slider while a background plays
 const SEE_THROUGH_APPS = ['chatgpt', 'obsidian', 'edge'];
+// closing the pane closes the window too, rather than handing it back (see embed.js)
+const CLOSES_WITH_PANE = ['edge'];
 
 function createAppPane(app) {
   const id = `pane-${nextId++}`;
   const el = document.createElement('section');
   el.className = 'pane app-pane';
   el.innerHTML = `
-    <div class="pane-header" title="Double-click to enlarge / shrink">
+    <div class="pane-header" title="Drag onto another pane to swap them. Double-click to enlarge / shrink">
       <span class="pane-num"></span>
       <span class="pane-title"></span>
       <span class="pane-path"></span>
       <span class="pane-status"></span>
       <button class="regrab icon-btn" title="Pull the window in again">${icon('restart')}</button>
       <button class="enlarge icon-btn" title="Enlarge / shrink (Ctrl+Shift+Enter)">${icon('enlarge')}</button>
-      <button class="close icon-btn" title="Give the window back (the program keeps running)">${icon('close')}</button>
+      <button class="close icon-btn" title="${CLOSES_WITH_PANE.includes(app) ? `Close this ${APP_NAMES[app]} window` : 'Give the window back (the program keeps running)'}">${icon('close')}</button>
     </div>
     <div class="pane-body app-body"><p class="app-msg"></p></div>`;
   el.querySelector('.pane-title').innerHTML = `<span class="logo logo-${app}"></span>`;
@@ -791,6 +975,7 @@ function createAppPane(app) {
   const p = { id, app, el, body: el.querySelector('.app-body'), statusEl: el.querySelector('.pane-status'), attached: false };
   panes.push(p);
   el.addEventListener('mousedown', () => setFocus(p));
+  el.querySelector('.pane-header').addEventListener('pointerdown', (e) => startMove(e, p));
   el.querySelector('.pane-header').addEventListener('dblclick', (e) => {
     if (e.target.tagName !== 'BUTTON') toggleEnlarge(p);
   });
@@ -808,7 +993,7 @@ async function attachApp(p) {
   p.el.querySelector('.app-msg').textContent = `Looking for ${APP_NAMES[p.app]}…`;
   setStatus(p, '');
   const res = await window.api.attachApp(p.id, p.app);
-  if (!p.el.isConnected) return window.api.releaseApp(p.id); // closed meanwhile
+  if (!p.el.isConnected) return window.api.closeApp(p.id); // closed meanwhile
   if (res.error) {
     p.el.querySelector('.app-msg').textContent = `${res.error}. Click the circular arrow to try again.`;
     setStatus(p, 'not inside', true);
@@ -822,7 +1007,7 @@ async function attachApp(p) {
 
 // Tell the main process where each pulled-in window goes, in screen pixels.
 function placeApps() {
-  const covered = [keysSheet, bgPanel, aboutPanel, setupSheet, layoutPanel].some((el) => el.classList.contains('open'));
+  const covered = !!movingPane || [keysSheet, bgPanel, aboutPanel, setupSheet, layoutPanel].some((el) => el.classList.contains('open'));
   const scale = window.devicePixelRatio;
   for (const p of panes) {
     if (!p.attached) continue;

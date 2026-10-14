@@ -360,17 +360,16 @@ input[type='checkbox'] {
 
 /* ---------- grid and panes ---------- */
 
+/* panes and the dividers between them are placed by arrange() in renderer.js */
 #grid {
   flex: 1;
-  display: grid;
-  gap: 8px;
-  padding: 8px;
   min-height: 0;
   position: relative;
   z-index: 1;
 }
 
 .pane {
+  position: absolute;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -391,6 +390,73 @@ input[type='checkbox'] {
   display: none;
 }
 
+/* dragging a pane by its title bar onto another one */
+.pane.moving {
+  opacity: 0.5;
+}
+
+.pane.drop-target {
+  border-color: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3), 0 0 28px rgba(255, 255, 255, 0.16);
+}
+
+body.moving-pane,
+body.moving-pane * {
+  cursor: grabbing !important;
+}
+
+/* the gaps between panes: drag to resize */
+.divider {
+  position: absolute;
+  z-index: 2;
+}
+
+.divider.drag-x {
+  cursor: col-resize;
+}
+
+.divider.drag-y {
+  cursor: row-resize;
+}
+
+/* a thin line down the middle of the gap, lit up on hover */
+.divider::after {
+  content: '';
+  position: absolute;
+  border-radius: 1px;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.divider.drag-x::after {
+  top: 6px;
+  bottom: 6px;
+  left: calc(50% - 1px);
+  width: 2px;
+}
+
+.divider.drag-y::after {
+  left: 6px;
+  right: 6px;
+  top: calc(50% - 1px);
+  height: 2px;
+}
+
+.divider:hover::after,
+.divider.active::after {
+  background: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 8px var(--glow);
+}
+
+body.resizing-x,
+body.resizing-x * {
+  cursor: col-resize !important;
+}
+
+body.resizing-y,
+body.resizing-y * {
+  cursor: row-resize !important;
+}
+
 .pane-header {
   display: flex;
   align-items: center;
@@ -401,6 +467,12 @@ input[type='checkbox'] {
   border-bottom: 1px solid var(--line);
   user-select: none;
   flex: none;
+  cursor: grab;
+}
+
+.pane-header button,
+.pane-header select {
+  cursor: pointer;
 }
 
 .pane-num {

@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('api', {
   focusApp: (id) => ipcRenderer.send('app:focus', id),
   setAppOpacity: (id, percent) => ipcRenderer.send('app:opacity', id, percent),
   releaseApp: (id) => ipcRenderer.send('app:release', id),
+  closeApp: (id) => ipcRenderer.send('app:close', id),
   onAppStatus: (cb) => ipcRenderer.on('app:status', (_e, id, status) => cb(id, status)),
   onAppCheck: (cb) => ipcRenderer.on('app:check', (_e, gone, titles) => cb(gone, titles)),
 

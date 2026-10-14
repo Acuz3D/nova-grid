@@ -173,6 +173,7 @@ ipcMain.on('app:place', (_e, id, rect, visible) => embed.place(id, rect, visible
 ipcMain.on('app:focus', (_e, id) => embed.focus(id));
 ipcMain.on('app:opacity', (_e, id, percent) => embed.opacity(id, percent));
 ipcMain.on('app:release', (_e, id) => embed.release(id));
+ipcMain.on('app:close', (_e, id) => embed.close(id));
 setInterval(() => {
   const { gone, titles } = embed.check();
   if (gone.length || Object.keys(titles).length) send('app:check', gone, titles);
