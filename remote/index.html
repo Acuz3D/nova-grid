@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta name="theme-color" content="#0b0b0c" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <title>Nova Grid</title>
+  <link rel="icon" href="icon.png" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="stylesheet" href="xterm.css" />
+  <link rel="stylesheet" href="remote.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="top">
+      <img class="brand-icon" src="icon.png" alt="" />
+      <span class="brand">Nova Grid</span>
+      <span id="conn" title="Connection to your PC"></span>
+      <div id="usage"></div>
+    </header>
+
+    <nav id="tabs"></nav>
+
+    <div id="pane-bar">
+      <select id="model" title="Which Claude model this terminal uses"></select>
+      <select id="effort" title="Claude's effort level for this terminal"></select>
+      <span class="spacer"></span>
+      <button id="text-smaller" class="icon-btn" title="Smaller text">A−</button>
+      <button id="text-bigger" class="icon-btn" title="Bigger text">A+</button>
+      <button id="fit" class="icon-btn" title="Fit to phone, or the same size as on the PC"></button>
+      <button id="restart" class="icon-btn" title="Restart Claude in this folder"></button>
+      <button id="close" class="icon-btn" title="Close this pane on the PC"></button>
+    </div>
+
+    <main id="view">
+      <div id="term-wrap"><div id="term"></div></div>
+      <div id="notice" hidden>
+        <p id="notice-text"></p>
+        <button id="notice-btn" class="primary" hidden></button>
+      </div>
+    </main>
+
+    <div id="keys"></div>
+
+    <form id="send-row" autocomplete="off">
+      <textarea id="input" rows="1" placeholder="Message Claude…" enterkeyhint="send" spellcheck="true"></textarea>
+      <button id="send" class="primary" type="submit" title="Send (an empty send presses Enter)"></button>
+    </form>
+  </div>
+
+  <div id="toast" hidden></div>
+
+  <div id="sheet-commands" class="sheet" hidden>
+    <div class="sheet-box">
+      <div class="sheet-top">
+        <span class="heading">Commands</span>
+        <input id="commands-search" type="search" placeholder="Search, e.g. compact, model" spellcheck="false" />
+        <button class="icon-btn sheet-close" title="Close"></button>
+      </div>
+      <div id="commands-list"></div>
+    </div>
+  </div>
+
+  <div id="sheet-new" class="sheet" hidden>
+    <div class="sheet-box">
+      <div class="sheet-top">
+        <span class="heading">New terminal</span>
+        <span class="spacer"></span>
+        <button class="icon-btn sheet-close" title="Close"></button>
+      </div>
+      <p class="note">Start Claude in one of these folders on your PC:</p>
+      <div id="recent-list"></div>
+      <form id="new-form" autocomplete="off">
+        <input id="new-path" type="text" placeholder="Or type a folder, e.g. C:\Users\me\project" spellcheck="false" autocapitalize="off" />
+        <button class="primary" type="submit">Open</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="gate">
+    <img class="gate-icon" src="icon.png" alt="" />
+    <span class="brand">Nova Grid</span>
+    <p id="gate-text">Connecting to your PC…</p>
+  </div>
+
+  <script src="xterm.js"></script>
+  <script src="addon-fit.js"></script>
+  <script src="commands.js"></script>
+  <script src="remote.js"></script>
+</body>
+</html>

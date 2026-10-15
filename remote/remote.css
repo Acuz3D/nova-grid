@@ -1,0 +1,553 @@
+/* The phone page: Nova Grid's look (black and white, hairline borders, white
+   light on whatever is selected) laid out for one hand on a small screen. */
+:root {
+  --bg: #0b0b0c;
+  --panel: #141415;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --text: #e4e4e4;
+  --muted: #8d8d8d;
+  --dim: #5a5a5a;
+  --serif: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --mono: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 100%; /* set to the visible height while the keyboard is open */
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(ellipse at 50% 0%, #1b1b1c 0%, var(--bg) 60%);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+
+button,
+select,
+input,
+textarea {
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+button:disabled {
+  opacity: 0.35;
+}
+
+button.primary {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.12);
+}
+
+button.icon-btn {
+  min-width: 36px;
+  padding: 0 8px;
+}
+
+select {
+  min-height: 36px;
+  padding: 0 8px;
+  max-width: 34vw;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 12.5px;
+}
+
+select option {
+  background: var(--panel);
+}
+
+input,
+textarea {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 9px 11px;
+  font-size: 16px; /* 16px stops iPhones zooming in on tap */
+  outline: none;
+}
+
+input:focus,
+textarea:focus {
+  border-color: var(--line-strong);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+svg.icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.brand {
+  font-family: var(--serif);
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* ---------- top: name, connection, usage ---------- */
+
+#top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 6px;
+}
+
+.brand-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+
+#conn {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dim);
+}
+
+#conn.ok {
+  background: #fff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
+}
+
+#usage {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+}
+
+.limit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.limit b {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.bar {
+  width: 44px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  background: #d8d8d8;
+}
+
+.fill.warn {
+  background: #e0b84f;
+}
+
+.fill.high {
+  background: #e06c5f;
+}
+
+/* ---------- panes ---------- */
+
+#tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px 12px 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: none;
+}
+
+#tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  flex: none;
+  max-width: 60vw;
+  gap: 7px;
+  color: var(--muted);
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tab span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab .num {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.tab.current {
+  color: #fff;
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.08);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.35);
+}
+
+.tab.exited .num::after {
+  content: ' ·';
+  color: #e06c5f;
+}
+
+#pane-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 8px;
+  flex: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+#pane-bar::-webkit-scrollbar {
+  display: none;
+}
+
+#pane-bar button {
+  flex: none;
+  font-size: 12.5px;
+}
+
+#close.confirm {
+  color: #e06c5f;
+  border-color: rgba(224, 108, 95, 0.5);
+}
+
+/* ---------- the terminal ---------- */
+
+#view {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+/* The terminal keeps its height while the keyboard is up; it sits at the
+   bottom so Claude's prompt stays in sight and the top is what gets hidden. */
+#term-wrap {
+  position: absolute;
+  inset: 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+
+#term {
+  flex: none;
+  width: 100%;
+}
+
+/* "same size as the PC": wider than the phone, so it scrolls sideways */
+#term-wrap.pc-size {
+  justify-content: flex-start;
+  overflow: auto;
+}
+
+#term-wrap.pc-size #term {
+  width: max-content;
+}
+
+.xterm .xterm-viewport {
+  background: transparent !important;
+}
+
+#notice {
+  position: absolute;
+  inset: auto 10px 10px 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(20, 20, 21, 0.96);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+#notice.full {
+  inset: 10px;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+#notice p {
+  margin: 0;
+  color: #bdbdbd;
+  line-height: 1.45;
+}
+
+/* ---------- keys and typing ---------- */
+
+#keys {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: none;
+}
+
+#keys::-webkit-scrollbar {
+  display: none;
+}
+
+#keys button {
+  flex: none;
+  min-width: 42px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: #cfcfcf;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+#keys button.wide {
+  font-family: inherit;
+}
+
+#send-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 12px calc(10px + env(safe-area-inset-bottom));
+  flex: none;
+}
+
+#input {
+  flex: 1;
+  min-width: 0;
+  max-height: 30vh;
+  resize: none;
+  line-height: 1.35;
+}
+
+#send {
+  min-width: 48px;
+  min-height: 42px;
+}
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(120px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  max-width: 90vw;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(20, 20, 21, 0.97);
+  border: 1px solid var(--line-strong);
+  color: #e4e4e4;
+  z-index: 30;
+}
+
+/* ---------- sheets (commands, new terminal) ---------- */
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.sheet-box {
+  width: 100%;
+  max-height: 85%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
+  background: rgba(20, 20, 21, 0.98);
+  border-top: 1px solid var(--line-strong);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.6);
+}
+
+.sheet-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sheet-top input {
+  flex: 1;
+  min-width: 0;
+}
+
+.heading {
+  font-family: var(--serif);
+  font-size: 17px;
+  color: #fff;
+}
+
+.note {
+  margin: 0;
+  color: var(--muted);
+}
+
+#commands-list,
+#recent-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#commands-list h3 {
+  margin: 12px 0 4px;
+  font-family: var(--serif);
+  font-weight: normal;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.cmd-row,
+.folder {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 9px 10px;
+  min-height: 0;
+  text-align: left;
+  border-color: transparent;
+}
+
+.cmd-name {
+  font-family: var(--mono);
+  color: #fff;
+}
+
+.cmd-args,
+.cmd-what,
+.folder-path {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.cmd-args {
+  font-family: var(--mono);
+}
+
+.folder-name {
+  color: #fff;
+}
+
+.folder-path {
+  word-break: break-all;
+}
+
+#new-form {
+  display: flex;
+  gap: 8px;
+}
+
+#new-path {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- not connected ---------- */
+
+#gate {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 30px;
+  text-align: center;
+  background: radial-gradient(ellipse at 50% 35%, #1b1b1c 0%, var(--bg) 70%);
+}
+
+#gate.hide {
+  display: none;
+}
+
+.gate-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.12);
+}
+
+#gate p {
+  max-width: 320px;
+  margin: 0;
+  color: #bdbdbd;
+  line-height: 1.5;
+}
