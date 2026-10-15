@@ -85,7 +85,8 @@ button.icon-btn {
 select {
   min-height: 36px;
   padding: 0 8px;
-  max-width: 34vw;
+  max-width: 25vw;
+  text-overflow: ellipsis;
   -webkit-appearance: none;
   appearance: none;
   background: rgba(255, 255, 255, 0.03);
@@ -253,7 +254,7 @@ svg.icon {
 #pane-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   padding: 0 12px 8px;
   flex: none;
   overflow-x: auto;
@@ -315,6 +316,11 @@ svg.icon {
 
 .xterm .xterm-viewport {
   background: transparent !important;
+  scrollbar-width: none;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar {
+  display: none;
 }
 
 #notice {
@@ -474,6 +480,7 @@ svg.icon {
 
 .cmd-row,
 .folder {
+  flex: none;
   display: flex;
   flex-direction: column;
   align-items: flex-start;

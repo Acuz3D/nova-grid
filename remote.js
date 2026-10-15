@@ -44,6 +44,8 @@ const cloudflaredPath = () => path.join(opts.dataDir(), 'bin', 'cloudflared.exe'
 
 function init(options) {
   opts = options;
+  // never leave the connector running after Nova Grid has gone
+  process.on('exit', shutdown);
   if (opts.loadConfig().remote?.on) start();
 }
 

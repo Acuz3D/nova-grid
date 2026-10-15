@@ -6,6 +6,10 @@ const panes = []; // { id, cwd, effort, model, el, term, fit, statusEl, running 
 let nextId = 1;
 let focused = null;
 let enlarged = null;
+// for the phone remote (further down)
+let remoteUsage = [];
+let remoteTimer = null;
+let recentFolders = JSON.parse(localStorage.getItem('recentFolders') || '[]');
 
 // The terminal itself is see-through; the pane behind it supplies the
 // (possibly translucent) background colour so a background video can show.
@@ -1230,10 +1234,6 @@ document.addEventListener('mousedown', (e) => {
 // Nova Grid can serve a page for watching and typing into the terminals from a
 // phone (remote.js). This window tells it what's open and hands over a
 // terminal's screen so far when a phone starts watching one.
-let remoteUsage = [];
-let remoteTimer = null;
-let recentFolders = JSON.parse(localStorage.getItem('recentFolders') || '[]');
-
 // Folders terminals were opened in, newest first, offered on the phone for a new terminal.
 function rememberFolder(cwd) {
   recentFolders = [cwd, ...recentFolders.filter((f) => f.toLowerCase() !== cwd.toLowerCase())].slice(0, 12);

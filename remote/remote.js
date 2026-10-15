@@ -219,7 +219,7 @@ function fillSelect(select, options, chosen, defaultLabel) {
 function renderPaneBar() {
   const p = pane();
   const isTerminal = p && !p.app;
-  for (const id of ['model', 'effort', 'text-smaller', 'text-bigger', 'fit', 'restart']) $(id).hidden = !isTerminal;
+  for (const id of ['model', 'effort', 'text-size', 'fit', 'restart']) $(id).hidden = !isTerminal;
   $('close').hidden = !p;
   if (!p) return;
   if (isTerminal) {
@@ -389,15 +389,15 @@ $('fit').addEventListener('click', () => {
   sizeTerminal();
 });
 
-function setFont(size) {
-  fontSize = Math.max(8, Math.min(18, size));
+// Text size goes round 10 → 11 → … → 15 → 10. Smaller fits more of Claude's screen.
+$('text-size').addEventListener('click', () => {
+  fontSize = fontSize >= 15 ? 10 : fontSize + 1;
   localStorage.setItem('novaFont', fontSize);
   term.options.fontSize = fontSize;
   tallest = { width: 0, height: 0 };
   sizeTerminal();
-}
-$('text-smaller').addEventListener('click', () => setFont(fontSize - 1));
-$('text-bigger').addEventListener('click', () => setFont(fontSize + 1));
+  toast(`Text size ${fontSize}`);
+});
 
 // Closing asks for a second tap.
 let closeTimer;
