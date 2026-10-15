@@ -9,6 +9,19 @@ A Windows app that runs several Claude Code terminals side by side in one window
 - Layouts: grid, side by side, stacked, or one big pane with the rest beside or below it. Drag the gaps between panes to resize them, and drag a pane's title bar onto another to swap them; panes always fill the window, with no empty spots
 - Video backgrounds (import a file or paste a YouTube link), with looping, volume and auto-play of the next video
 - A Commands sheet (F1) listing all of Claude's / commands; click one to type it into the selected terminal
+- A phone remote: scan a QR code and watch and type into your terminals from your phone, from anywhere
+
+## Phone remote
+
+Click the phone button in the top bar, then **Turn on**. The first time, Nova Grid downloads Cloudflare's free connector (cloudflared, about 55 MB) into its settings folder. Then it shows a QR code: scan it with your phone's camera and the page opens in your phone's browser.
+
+On the phone you get every terminal live, a box to type to Claude, buttons for the keys a phone keyboard doesn't have (Esc, Shift+Tab, arrows, Enter, Ctrl+C), Claude's / commands, model and effort, restart, close, and opening a new terminal in a folder you've used before. While a phone watches a terminal, the terminal takes the phone's size so Claude's screen fits it; the PC pane says "sized for phone" and goes back when the phone leaves (or tap the phone icon on the phone for the PC's size instead).
+
+- The page is reached through a Cloudflare quick tunnel (a random `trycloudflare.com` address), so it works on mobile data too. Nova Grid itself only listens on the PC.
+- The QR code holds a long secret key; without it the page shows nothing. **New link** makes a new key and locks out every phone with the old one. Keep the link to yourself: anyone who has it can type into your terminals.
+- The address changes each time Nova Grid starts (or the connection drops), so scan again after that.
+- While it's on, the PC won't go to sleep. It stays on (or off) across restarts.
+- ChatGPT, Obsidian and Edge panes aren't shown on the phone; use their own phone apps.
 
 ## Download
 
