@@ -188,6 +188,7 @@ input[type='checkbox'] {
 #toolbar input,
 #bg-menu,
 #about-menu,
+#phone-menu,
 #layout-menu,
 #usage {
   -webkit-app-region: no-drag;
@@ -681,6 +682,7 @@ body.resizing-y * {
 #layout-panel,
 #bg-panel,
 #about-panel,
+#phone-panel,
 #setup-box,
 #keys-box {
   background: rgba(20, 20, 21, 0.96);
@@ -1101,4 +1103,72 @@ body.resizing-y * {
 #empty-signin {
   font-size: 11.5px;
   color: var(--dim);
+}
+
+/* ---------- phone remote ---------- */
+
+#phone-menu {
+  position: relative;
+  display: flex;
+}
+
+/* a soft light on the button while phones can connect */
+#phone-btn.live {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
+}
+
+#phone-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: 300px;
+  padding: 14px;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 10;
+  cursor: default;
+}
+
+#phone-panel.open {
+  display: flex;
+}
+
+#phone-state {
+  color: var(--muted);
+}
+
+#phone-qr {
+  align-self: center;
+  width: 200px;
+  height: 200px;
+  border-radius: 8px;
+  image-rendering: pixelated;
+}
+
+#phone-link {
+  flex: 3;
+  min-width: 0;
+  font-size: 11px;
+}
+
+/* a terminal sized for a phone that's watching it */
+.pane-phone {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.pane-phone svg.icon {
+  width: 12px;
+  height: 12px;
+}
+
+.pane.on-phone .pane-phone {
+  display: inline-flex;
 }

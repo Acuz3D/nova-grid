@@ -50,6 +50,17 @@ contextBridge.exposeInMainWorld('api', {
   installUpdate: () => ipcRenderer.send('update:install'),
   onUpdate: (cb) => ipcRenderer.on('update', (_e, state) => cb(state)),
 
+  remoteStatus: () => ipcRenderer.invoke('remote:status'),
+  startRemote: () => ipcRenderer.invoke('remote:start'),
+  stopRemote: () => ipcRenderer.invoke('remote:stop'),
+  newRemoteKey: () => ipcRenderer.invoke('remote:new-key'),
+  onRemoteStatus: (cb) => ipcRenderer.on('remote:status', (_e, status) => cb(status)),
+  sendRemoteState: (state) => ipcRenderer.send('remote:state', state),
+  onRemoteSizes: (cb) => ipcRenderer.on('remote:sizes', (_e, sizes) => cb(sizes)),
+  onRemoteSnapshot: (cb) => ipcRenderer.on('remote:snapshot', (_e, req, id) => cb(req, id)),
+  sendRemoteSnapshot: (req, screen) => ipcRenderer.send('remote:snapshot', req, screen),
+  onRemoteCommand: (cb) => ipcRenderer.on('remote:command', (_e, command) => cb(command)),
+
   copy: (text) => ipcRenderer.send('clipboard:write', text),
   paste: () => ipcRenderer.invoke('clipboard:read'),
 });

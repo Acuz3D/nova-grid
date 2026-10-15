@@ -100,6 +100,24 @@
         <p class="bg-note">Loops just this part of the video. <span id="bg-length"></span></p>
       </div>
     </div>
+    <div id="phone-menu">
+      <button id="phone-btn" class="icon-btn" title="Phone remote: use your terminals from your phone"><i data-icon="phone"></i></button>
+      <div id="phone-panel">
+        <span class="keys-heading">Phone remote</span>
+        <p class="about-line">Watch and type into your terminals from your phone, wherever you are.</p>
+        <p id="phone-state" class="about-line"></p>
+        <img id="phone-qr" alt="QR code for the phone link" hidden />
+        <div id="phone-link-row" class="bg-row" hidden>
+          <input id="phone-link" type="text" readonly spellcheck="false" />
+          <button id="phone-copy">Copy</button>
+        </div>
+        <div class="bg-row">
+          <button id="phone-toggle" class="primary">Turn on</button>
+          <button id="phone-new-key" title="Make a new link. Every phone with the old one is locked out">New link</button>
+        </div>
+        <p class="bg-note">Anyone with the link can use your terminals, so keep it to yourself. While it's on, your PC won't go to sleep. The link changes each time Nova Grid starts, so scan again after that.</p>
+      </div>
+    </div>
     <span id="count"></span>
     <div id="usage"></div>
     <button id="update-btn" class="primary" hidden title="A new version of Nova Grid is ready. Restarting closes your terminals; they reopen afterwards">Restart to update</button>
@@ -159,6 +177,7 @@
 
   <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
   <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="../node_modules/@xterm/addon-serialize/lib/addon-serialize.js"></script>
   <script src="commands.js"></script>
   <script src="renderer.js"></script>
 </body>

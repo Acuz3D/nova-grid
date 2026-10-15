@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, clipboard, shell, nativeTheme } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, clipboard, shell, nativeTheme, powerSaveBlocker } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -7,6 +7,7 @@ const { spawn } = require('child_process');
 const pty = require('node-pty');
 const { autoUpdater } = require('electron-updater');
 const embed = require('./embed');
+const remote = require('./remote');
 
 // Let the background video play with sound without a click first.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -400,9 +401,11 @@ ipcMain.handle('pty:start', (_e, { id, cwd, cols, rows, effort, model, resume })
     env: paneEnv(id),
   });
   ptys.set(id, proc);
+  remote.ptyStarted(id);
 
   proc.onData((data) => {
     send('pty:data', id, data);
+    remote.ptyData(id, data);
   });
   proc.onExit(({ exitCode }) => {
     // Only report exits we didn't cause; a killed or replaced process is already gone from the map.
@@ -477,6 +480,24 @@ ipcMain.on('pty:kill', (_e, id) => {
     proc?.kill();
   } catch {}
 });
+
+// Phone remote (see remote.js). The window reports what's open, and hands over
+// a terminal's screen so far when a phone starts watching it.
+let awake = null;
+function keepAwake(on) {
+  if (on && awake === null) awake = powerSaveBlocker.start('prevent-app-suspension');
+  if (!on && awake !== null) {
+    powerSaveBlocker.stop(awake);
+    awake = null;
+  }
+}
+
+ipcMain.handle('remote:status', () => remote.status());
+ipcMain.handle('remote:start', () => remote.start());
+ipcMain.handle('remote:stop', () => remote.stop());
+ipcMain.handle('remote:new-key', () => remote.newKey());
+ipcMain.on('remote:state', (_e, state) => remote.setState(state));
+ipcMain.on('remote:snapshot', (_e, req, screen) => remote.snapshotReply(req, screen));
 
 ipcMain.on('clipboard:write', (_e, text) => clipboard.writeText(text));
 ipcMain.handle('clipboard:read', () => clipboard.readText());
@@ -592,12 +613,14 @@ app.whenReady().then(() => {
   writeStatusLineLauncher();
   watchUsage();
   createWindow();
+  remote.init({ dataDir: () => app.getPath('userData'), ptys, send, loadConfig, saveConfig, keepAwake, version: app.getVersion() });
   win.webContents.on('did-finish-load', sendAccountUsage);
   win.webContents.once('did-finish-load', checkForUpdates);
   setInterval(sendAccountUsage, ACCOUNT_USAGE_EVERY);
   setInterval(checkForUpdates, UPDATE_CHECK_EVERY);
 });
 app.on('before-quit', () => {
+  remote.shutdown();
   embed.releaseAll();
   killAll();
 });

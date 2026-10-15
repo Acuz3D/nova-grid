@@ -38,6 +38,7 @@ const ICONS = {
   layoutMainTop: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 14h16M9.33 14v6M14.67 14v6"/>',
   moveLeft: '<path d="M15 6l-6 6 6 6"/>',
   moveRight: '<path d="M9 6l6 6-6 6"/>',
+  phone: '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/>',
 };
 const icon = (name) => `<svg class="icon" viewBox="0 0 24 24">${ICONS[name]}</svg>`;
 document.querySelectorAll('[data-icon]').forEach((el) => (el.outerHTML = icon(el.dataset.icon)));
@@ -265,16 +266,23 @@ function layout() {
   count.textContent = panes.length ? `${panes.length} open` : '';
   arrange();
   visible.forEach(fitPane);
+  pushRemoteState();
 }
 
 // Window resized: same arrangement, new size.
 new ResizeObserver(() => arrange()).observe(grid);
 
-function fitPane(p) {
-  if (resizing || p.app || p.el.classList.contains('hidden')) return;
+// A terminal a phone is watching takes the phone's size instead (see the phone remote below).
+function sizeTerm(p) {
+  if (p.remoteSize) return p.term.resize(p.remoteSize.cols, p.remoteSize.rows);
   try {
     p.fit.fit();
   } catch {}
+}
+
+function fitPane(p) {
+  if (resizing || p.app || (p.el.classList.contains('hidden') && !p.remoteSize)) return;
+  sizeTerm(p);
   if (p.running) window.api.resize(p.id, p.term.cols, p.term.rows);
 }
 
@@ -294,6 +302,7 @@ function toggleEnlarge(p) {
 function setStatus(p, text, exited = false) {
   p.statusEl.textContent = text;
   p.statusEl.classList.toggle('exited', exited);
+  pushRemoteState();
 }
 
 // resume: carry on the pane's current conversation instead of starting fresh.
@@ -301,9 +310,7 @@ async function startClaude(p, resume = false) {
   p.term.reset();
   p.startedAt = Date.now();
   setStatus(p, 'starting…');
-  try {
-    p.fit.fit();
-  } catch {}
+  sizeTerm(p);
   const res = await window.api.start({ id: p.id, cwd: p.cwd, cols: p.term.cols, rows: p.term.rows, effort: p.effort, model: p.model, resume: resume ? p.session : null });
   if (res.error) {
     p.running = false;
@@ -357,6 +364,7 @@ function createPane(cwd, effort = '', model = '') {
       <span class="pane-title"></span>
       <span class="pane-path"></span>
       <span class="pane-status"></span>
+      <span class="pane-phone" title="A phone is watching this terminal, so it's sized for the phone. It goes back when the phone leaves">${icon('phone')}sized for phone</span>
       <button class="mcp" title="MCP servers: checking…">MCP …</button>
       <select class="model" title="Which Claude model this terminal uses">
         <option value="">model: default</option>
@@ -394,10 +402,13 @@ function createPane(cwd, effort = '', model = '') {
   });
   const fit = new FitAddon.FitAddon();
   term.loadAddon(fit);
+  const serialize = new SerializeAddon.SerializeAddon(); // the screen so far, for a phone
+  term.loadAddon(serialize);
   term.open(el.querySelector('.pane-body'));
 
-  const p = { id, cwd, effort, model, el, term, fit, statusEl: el.querySelector('.pane-status'), running: false };
+  const p = { id, cwd, effort, model, el, term, fit, serialize, statusEl: el.querySelector('.pane-status'), running: false };
   panes.push(p);
+  rememberFolder(cwd);
 
   term.attachCustomKeyEventHandler(keyHandler(p));
   term.onData((data) => {
@@ -462,6 +473,7 @@ async function showMcp(p, refresh = false) {
 function setOption(p, option, value) {
   p[option] = value;
   save();
+  pushRemoteState();
   if (p.running) restartPane(p, true);
   p.term.focus();
 }
@@ -490,7 +502,10 @@ function closePane(p) {
 
 async function addPane() {
   const cwd = await window.api.pickFolder();
-  if (!cwd) return;
+  if (cwd) openPane(cwd);
+}
+
+function openPane(cwd) {
   enlarged = null;
   const p = createPane(cwd);
   save();
@@ -566,6 +581,7 @@ function renderUsage(byPane) {
   const latest = lastLimits;
   const usage = document.getElementById('usage');
   usage.replaceChildren();
+  remoteUsage = [];
 
   for (const [key, name, about] of LIMITS) {
     let limit = latest?.rate_limits[key];
@@ -585,7 +601,9 @@ function renderUsage(byPane) {
     fill.classList.toggle('warn', pct >= 70);
     fill.classList.toggle('high', pct >= 90);
     usage.appendChild(el);
+    remoteUsage.push({ name, pct, reset: limit?.resets_at ? formatReset(limit.resets_at) : '' });
   }
+  pushRemoteState();
 }
 
 // Keep each pane's dropdowns in step with what Claude reports, so changes made
@@ -614,6 +632,7 @@ function syncOptions(byPane) {
       }
     }
   }
+  pushRemoteState();
 }
 
 window.api.onAccountUsage((result) => {
@@ -1007,7 +1026,7 @@ async function attachApp(p) {
 
 // Tell the main process where each pulled-in window goes, in screen pixels.
 function placeApps() {
-  const covered = !!movingPane || [keysSheet, bgPanel, aboutPanel, setupSheet, layoutPanel].some((el) => el.classList.contains('open'));
+  const covered = !!movingPane || [keysSheet, bgPanel, aboutPanel, setupSheet, layoutPanel, phonePanel].some((el) => el.classList.contains('open'));
   const scale = window.devicePixelRatio;
   for (const p of panes) {
     if (!p.attached) continue;
@@ -1206,6 +1225,126 @@ document.getElementById('layout-make-main').addEventListener('click', () => focu
 document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('#layout-menu')) layoutPanel.classList.remove('open');
 });
+
+// ---------- phone remote ----------
+// Nova Grid can serve a page for watching and typing into the terminals from a
+// phone (remote.js). This window tells it what's open and hands over a
+// terminal's screen so far when a phone starts watching one.
+let remoteUsage = [];
+let remoteTimer = null;
+let recentFolders = JSON.parse(localStorage.getItem('recentFolders') || '[]');
+
+// Folders terminals were opened in, newest first, offered on the phone for a new terminal.
+function rememberFolder(cwd) {
+  recentFolders = [cwd, ...recentFolders.filter((f) => f.toLowerCase() !== cwd.toLowerCase())].slice(0, 12);
+  localStorage.setItem('recentFolders', JSON.stringify(recentFolders));
+}
+
+function pushRemoteState() {
+  clearTimeout(remoteTimer);
+  remoteTimer = setTimeout(() => {
+    const defaultLabel = (p, option) => p.el.querySelector(`.${option}`).options[0].textContent;
+    window.api.sendRemoteState({
+      panes: panes.map((p, i) => ({
+        id: p.id,
+        num: i + 1,
+        app: p.app || null,
+        title: p.app ? APP_NAMES[p.app] : folderName(p.cwd),
+        cwd: p.cwd || null,
+        running: !!p.running,
+        status: p.statusEl.textContent,
+        model: p.model || '',
+        effort: p.effort || '',
+        modelDefault: p.app ? '' : defaultLabel(p, 'model'),
+        effortDefault: p.app ? '' : defaultLabel(p, 'effort'),
+        cols: p.term?.cols || 0,
+        rows: p.term?.rows || 0,
+      })),
+      usage: remoteUsage,
+      recent: recentFolders,
+    });
+  }, 150);
+}
+
+window.api.onRemoteSizes((sizes) => {
+  for (const p of panes) {
+    if (p.app) continue;
+    const size = sizes[p.id] || null;
+    if (JSON.stringify(size) === JSON.stringify(p.remoteSize || null)) continue;
+    p.remoteSize = size;
+    p.el.classList.toggle('on-phone', !!size);
+    fitPane(p);
+  }
+  pushRemoteState();
+});
+
+window.api.onRemoteSnapshot((req, id) => {
+  const p = panes.find((x) => x.id === id && !x.app);
+  if (!p) return window.api.sendRemoteSnapshot(req, null);
+  // once everything already received has been drawn
+  p.term.write('', () => window.api.sendRemoteSnapshot(req, { data: p.serialize.serialize({ scrollback: 1000 }), cols: p.term.cols, rows: p.term.rows }));
+});
+
+window.api.onRemoteCommand(({ action, id, value, cwd }) => {
+  if (action === 'add') return openPane(cwd);
+  const p = panes.find((x) => x.id === id);
+  if (!p) return;
+  if (action === 'close') return closePane(p);
+  if (p.app) return;
+  if (action === 'restart') restartPane(p);
+  if (action === 'model' || action === 'effort') {
+    const select = p.el.querySelector(`.${action}`);
+    if (![...select.options].some((o) => o.value === value)) return;
+    select.value = value;
+    setOption(p, action, value);
+  }
+});
+
+// The phone button and its panel: turn it on, scan the code.
+const phonePanel = document.getElementById('phone-panel');
+const phoneBtn = document.getElementById('phone-btn');
+const phoneToggle = document.getElementById('phone-toggle');
+let remote = { on: false, stage: 'off' };
+
+function showRemote(s) {
+  remote = s;
+  const phones = s.phones ? `${s.phones} phone${s.phones === 1 ? '' : 's'} connected.` : "Scan the code with your phone's camera.";
+  const text = {
+    off: 'Off.',
+    starting: s.message || 'Starting…',
+    downloading: `Getting Cloudflare's connector (first time only)… ${s.percent || 0}%`,
+    connecting: 'Almost ready…',
+    ready: `Ready. ${phones}`,
+    error: s.message || 'Something went wrong.',
+  };
+  document.getElementById('phone-state').textContent = text[s.stage] ?? '';
+  const qr = document.getElementById('phone-qr');
+  qr.hidden = !s.qr;
+  if (s.qr) qr.src = s.qr;
+  document.getElementById('phone-link-row').hidden = !s.link;
+  document.getElementById('phone-link').value = s.link || '';
+  phoneToggle.textContent = s.on ? 'Turn off' : 'Turn on';
+  phoneToggle.classList.toggle('primary', !s.on);
+  document.getElementById('phone-new-key').disabled = !s.on;
+  phoneBtn.classList.toggle('live', s.on && s.stage === 'ready');
+  phoneBtn.title = s.on ? `Phone remote: ${text[s.stage] ?? ''}` : 'Phone remote: use your terminals from your phone';
+}
+
+phoneBtn.addEventListener('click', () => phonePanel.classList.toggle('open'));
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('#phone-menu')) phonePanel.classList.remove('open');
+});
+phoneToggle.addEventListener('click', async () => {
+  showRemote(await (remote.on ? window.api.stopRemote() : window.api.startRemote()));
+});
+document.getElementById('phone-new-key').addEventListener('click', async () => showRemote(await window.api.newRemoteKey()));
+document.getElementById('phone-copy').addEventListener('click', (e) => {
+  window.api.copy(document.getElementById('phone-link').value);
+  e.currentTarget.textContent = 'Copied';
+  setTimeout(() => (document.getElementById('phone-copy').textContent = 'Copy'), 1500);
+});
+window.api.onRemoteStatus(showRemote);
+window.api.remoteStatus().then(showRemote);
 
 // Reopen the folders from last time.
 (async () => {
