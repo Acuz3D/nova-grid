@@ -1,6 +1,6 @@
 {
   "name": "nova-grid",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Several Claude Code terminals in one window, each in its own folder",
   "main": "main.js",
   "scripts": {

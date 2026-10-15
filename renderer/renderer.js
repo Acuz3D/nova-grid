@@ -986,6 +986,7 @@ function createAppPane(app) {
       <span class="pane-title"></span>
       <span class="pane-path"></span>
       <span class="pane-status"></span>
+      <span class="pane-phone" title="A phone is watching this window, so it's shaped like the phone. It goes back when the phone leaves">${icon('phone')}sized for phone</span>
       <button class="regrab icon-btn" title="Pull the window in again">${icon('restart')}</button>
       <button class="enlarge icon-btn" title="Enlarge / shrink (Ctrl+Shift+Enter)">${icon('enlarge')}</button>
       <button class="close icon-btn" title="${CLOSES_WITH_PANE.includes(app) ? `Close this ${APP_NAMES[app]} window` : 'Give the window back (the program keeps running)'}">${icon('close')}</button>
@@ -1026,6 +1027,7 @@ async function attachApp(p) {
   p.el.querySelector('.pane-path').textContent = res.title;
   p.el.querySelector('.app-msg').textContent = '';
   placeApps();
+  pushRemoteState();
 }
 
 // Tell the main process where each pulled-in window goes, in screen pixels.
@@ -1036,7 +1038,10 @@ function placeApps() {
     if (!p.attached) continue;
     const visible = !covered && !p.el.classList.contains('hidden');
     const r = p.body.getBoundingClientRect();
-    const rect = { x: Math.round(r.left * scale), y: Math.round(r.top * scale), width: Math.round(r.width * scale), height: Math.round(r.height * scale) };
+    // a phone watching it: the phone's shape, at the pane's top left
+    const width = p.remoteSize ? Math.min(r.width, p.remoteSize.width) : r.width;
+    const height = p.remoteSize ? Math.min(r.height, p.remoteSize.height) : r.height;
+    const rect = { x: Math.round(r.left * scale), y: Math.round(r.top * scale), width: Math.round(width * scale), height: Math.round(height * scale) };
     const key = JSON.stringify([rect, visible]);
     if (key !== p.lastPlace) {
       p.lastPlace = key;
@@ -1249,6 +1254,7 @@ function pushRemoteState() {
         id: p.id,
         num: i + 1,
         app: p.app || null,
+        attached: !!p.attached,
         title: p.app ? APP_NAMES[p.app] : folderName(p.cwd),
         cwd: p.cwd || null,
         running: !!p.running,
@@ -1268,12 +1274,12 @@ function pushRemoteState() {
 
 window.api.onRemoteSizes((sizes) => {
   for (const p of panes) {
-    if (p.app) continue;
     const size = sizes[p.id] || null;
     if (JSON.stringify(size) === JSON.stringify(p.remoteSize || null)) continue;
     p.remoteSize = size;
     p.el.classList.toggle('on-phone', !!size);
-    fitPane(p);
+    if (p.app) placeApps();
+    else fitPane(p);
   }
   pushRemoteState();
 });
@@ -1290,7 +1296,19 @@ window.api.onRemoteCommand(({ action, id, value, cwd }) => {
   const p = panes.find((x) => x.id === id);
   if (!p) return;
   if (action === 'close') return closePane(p);
-  if (p.app) return;
+  if (p.app) {
+    if (action === 'regrab') attachApp(p);
+    // a phone wants to see this program, which only draws while showing here
+    if (action === 'reveal') {
+      if (enlarged && enlarged !== p) {
+        enlarged = null;
+        layout();
+      }
+      for (const panel of [keysSheet, bgPanel, aboutPanel, layoutPanel, phonePanel]) panel.classList.remove('open');
+      placeApps();
+    }
+    return;
+  }
   if (action === 'restart') restartPane(p);
   if (action === 'model' || action === 'effort') {
     const select = p.el.querySelector(`.${action}`);

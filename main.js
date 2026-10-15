@@ -492,6 +492,14 @@ function keepAwake(on) {
   }
 }
 
+// A phone watching a program pane needs Nova Grid showing on the PC: a
+// minimised or covered window draws nothing, and takes no mouse wheel.
+function showWindow() {
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.moveTop();
+}
+
 ipcMain.handle('remote:status', () => remote.status());
 ipcMain.handle('remote:start', () => remote.start());
 ipcMain.handle('remote:stop', () => remote.stop());
@@ -613,7 +621,7 @@ app.whenReady().then(() => {
   writeStatusLineLauncher();
   watchUsage();
   createWindow();
-  remote.init({ dataDir: () => app.getPath('userData'), ptys, send, loadConfig, saveConfig, keepAwake, version: app.getVersion() });
+  remote.init({ dataDir: () => app.getPath('userData'), ptys, embed, showWindow, send, loadConfig, saveConfig, keepAwake, version: app.getVersion() });
   win.webContents.on('did-finish-load', sendAccountUsage);
   win.webContents.once('did-finish-load', checkForUpdates);
   setInterval(sendAccountUsage, ACCOUNT_USAGE_EVERY);

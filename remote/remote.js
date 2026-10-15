@@ -1,6 +1,8 @@
 // Nova Grid on a phone: the terminals open on the PC, live, with a box to type
-// into and buttons for the keys a phone keyboard doesn't have. Everything goes
-// through Nova Grid on the PC (remote.js there); this page only shows it.
+// into and buttons for the keys a phone keyboard doesn't have. ChatGPT,
+// Obsidian and Edge panes come as a live picture to tap, swipe and type into.
+// Everything goes through Nova Grid on the PC (remote.js there); this page
+// only shows it.
 
 const ICONS = {
   restart: '<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/>',
@@ -33,6 +35,18 @@ const KEYS = [
   ['Ctrl+C', '\x03', 'wide'],
 ];
 
+// The same for a program pane, sent as key presses by name.
+const APP_KEYS = [
+  ['Esc', 'Escape'],
+  ['Tab', 'Tab'],
+  ['↑', 'ArrowUp'],
+  ['↓', 'ArrowDown'],
+  ['←', 'ArrowLeft'],
+  ['→', 'ArrowRight'],
+  ['⌫', 'Backspace'],
+  ['Enter', 'Enter', 'wide'],
+];
+
 // ---------- the secret key from the QR code ----------
 // It comes after the # so it never leaves the phone in a request; it's kept,
 // then taken out of the address bar so it doesn't show in screenshots.
@@ -55,6 +69,8 @@ let state = { panes: [], usage: [], recent: [] };
 let current = null; // id of the pane on screen
 let viewSent = '';
 let pendingFolder = null; // a terminal asked for from here, to switch to once it opens
+let pictureState = null; // a program pane: 'ok', or why the PC can't show it
+let pictureNext = false; // a picture is due as the next binary message
 let fit = localStorage.getItem('novaFit') !== 'pc';
 let fontSize = Number(localStorage.getItem('novaFont')) || 12;
 
@@ -82,8 +98,9 @@ function connect() {
   if (!key) return gate('Open this page by scanning the code in Nova Grid on your PC: click the phone button in the top bar, then Turn on.');
   gate(connected ? null : 'Connecting to your PC…');
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  ws.binaryType = 'blob';
   ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', key }));
-  ws.onmessage = (e) => onMessage(JSON.parse(e.data));
+  ws.onmessage = (e) => (typeof e.data === 'string' ? onMessage(JSON.parse(e.data)) : onPicture(e.data));
   ws.onclose = () => {
     connected = false;
     viewSent = '';
@@ -113,6 +130,14 @@ function onMessage(msg) {
   if (msg.t === 'state') return onState(msg);
   if (msg.t === 'error') return toast(msg.message);
   if (msg.id !== current) return;
+  if (msg.t === 'picture') {
+    pictureNext = msg.state === 'ok';
+    if (msg.state !== pictureState) {
+      pictureState = msg.state;
+      renderNotice();
+    }
+    return;
+  }
   if (msg.t === 'screen') {
     term.reset();
     if (msg.cols && msg.rows) term.resize(msg.cols, msg.rows);
@@ -122,6 +147,30 @@ function onMessage(msg) {
   } else if (msg.t === 'reset') {
     term.reset();
   }
+}
+
+// A new picture of the program pane on screen. The PC sends the next one
+// once this one is showing.
+const shot = $('shot');
+let shotUrl = null;
+function onPicture(blob) {
+  if (!pictureNext) return;
+  pictureNext = false;
+  const url = URL.createObjectURL(blob);
+  shot.onload = shot.onerror = () => {
+    if (shotUrl && shotUrl !== url) URL.revokeObjectURL(shotUrl);
+    shotUrl = url;
+    send({ t: 'shown' });
+  };
+  shot.src = url;
+}
+
+function clearPicture() {
+  shot.removeAttribute('src');
+  if (shotUrl) URL.revokeObjectURL(shotUrl);
+  shotUrl = null;
+  pictureState = null;
+  pictureNext = false;
 }
 
 function gate(text) {
@@ -154,9 +203,15 @@ function onState(next) {
 
 const pane = () => state.panes.find((p) => p.id === current);
 
+let rendered = null; // the pane on screen last time
 function render() {
+  if (current !== rendered) {
+    rendered = current;
+    clearPicture();
+  }
   renderUsage();
   renderTabs();
+  renderKeys();
   renderPaneBar();
   renderNotice();
   sizeTerminal();
@@ -219,16 +274,18 @@ function fillSelect(select, options, chosen, defaultLabel) {
 function renderPaneBar() {
   const p = pane();
   const isTerminal = p && !p.app;
-  for (const id of ['model', 'effort', 'text-size', 'fit', 'restart']) $(id).hidden = !isTerminal;
-  $('close').hidden = !p;
+  for (const id of ['model', 'effort', 'text-size']) $(id).hidden = !isTerminal;
+  for (const id of ['fit', 'restart', 'close']) $(id).hidden = !p;
   if (!p) return;
   if (isTerminal) {
     fillSelect($('model'), MODELS, p.model, p.modelDefault || 'model: default');
     fillSelect($('effort'), EFFORTS.map((e) => [e, `effort: ${e}`]), p.effort, p.effortDefault || 'effort: default');
   }
+  $('restart').title = p.app ? `Pull the ${p.title} window into its pane again` : 'Restart Claude in this folder';
   $('close').title = p.app ? `Close this ${p.title} pane on the PC` : 'Close this terminal on the PC';
   $('fit').innerHTML = icon(fit ? 'fitPhone' : 'fitPc');
   $('fit').title = fit ? 'Fitted to the phone. Tap for the same size as on the PC' : 'Same size as on the PC. Tap to fit it to the phone';
+  input.placeholder = p.app ? `Type into ${p.title}…` : 'Message Claude…';
 }
 
 function renderNotice() {
@@ -241,15 +298,26 @@ function renderNotice() {
     button = ['Open a terminal', openNewSheet];
     full = true;
   } else if (p?.app) {
-    text = `${p.title} is open on your PC. The phone remote shows Claude terminals only, so use the ${p.title} app on your phone for this one.`;
-    full = true;
+    const reveal = ['Show it on the PC', () => send({ t: 'cmd', action: 'reveal', id: p.id })];
+    if (!p.attached || pictureState === 'gone') {
+      text = `${p.title} isn't in its pane on your PC right now.`;
+      button = ['Pull it in again', () => send({ t: 'cmd', action: 'regrab', id: p.id })];
+    } else if (pictureState === 'minimised') {
+      text = `Nova Grid is minimised on your PC, so ${p.title} can't be shown.`;
+      button = reveal;
+    } else if (pictureState === 'hidden') {
+      text = `${p.title} is hidden on your PC (another pane is enlarged, or a menu is open).`;
+      button = reveal;
+    }
+    full = !!text;
   } else if (p && !p.running && p.status !== 'starting…') {
     text = p.status === 'failed' ? "Claude couldn't start in this folder." : `Claude has stopped${p.status ? ` (${p.status})` : ''}.`;
     button = ['Start it again', () => send({ t: 'cmd', action: 'restart', id: p.id })];
   }
   $('notice').hidden = !text;
   $('notice').classList.toggle('full', full);
-  $('term-wrap').style.visibility = full ? 'hidden' : '';
+  $('term-wrap').style.visibility = full || p?.app ? 'hidden' : '';
+  $('shot-wrap').hidden = full || !p?.app;
   $('notice-text').textContent = text || '';
   $('notice-btn').hidden = !button;
   if (button) {
@@ -266,11 +334,22 @@ function renderNotice() {
 // view instead.
 let tallest = { width: 0, height: 0 };
 
+let tallestView = { width: 0, height: 0 };
+
 function sizeTerminal() {
   const p = pane();
   const wrap = $('term-wrap');
   wrap.classList.toggle('pc-size', !fit);
-  if (!p || p.app || document.hidden) return sendView(null);
+  $('shot-wrap').classList.toggle('pc-size', !fit);
+  if (!p || document.hidden) return sendView(null);
+
+  // A program pane on the PC takes the phone's shape, in the phone's screen points.
+  if (p.app) {
+    if (!fit) return sendView({ id: p.id, fit: false });
+    const view = $('view');
+    if (view.clientWidth !== tallestView.width || view.clientHeight > tallestView.height) tallestView = { width: view.clientWidth, height: view.clientHeight };
+    return sendView({ id: p.id, fit: true, width: tallestView.width, height: tallestView.height });
+  }
 
   if (!fit) {
     $('term').style.height = '';
@@ -300,7 +379,7 @@ const sizeSoon = () => {
   clearTimeout(sizeTimer);
   sizeTimer = setTimeout(sizeTerminal, 150);
 };
-new ResizeObserver(sizeSoon).observe($('term-wrap'));
+new ResizeObserver(sizeSoon).observe($('view'));
 
 // While the keyboard is up, the page is only as tall as what's still visible.
 function fitToScreen() {
@@ -331,8 +410,13 @@ function write(data) {
 // Shift+Enter does on the PC.
 function sendMessage() {
   const text = input.value;
-  if (!pane() || pane().app) return;
-  if (text) {
+  const p = pane();
+  if (!p) return;
+  if (p.app) {
+    // typed into whatever was last tapped in the picture, then Enter
+    if (text) send({ t: 'type', id: p.id, text });
+    setTimeout(() => send({ t: 'key', id: p.id, key: 'Enter' }), 60);
+  } else if (text) {
     write(text.replace(/\r?\n/g, '\x1b\r'));
     setTimeout(() => write('\r'), 60);
   } else {
@@ -365,15 +449,89 @@ function keepFocus(button) {
   button.addEventListener('pointerdown', (e) => e.preventDefault());
 }
 
-for (const [label, data, kind] of KEYS) {
-  const button = document.createElement('button');
-  button.textContent = label;
-  if (kind === 'wide' || kind === 'commands') button.className = 'wide';
-  keepFocus(button);
-  button.addEventListener('click', () => (kind === 'commands' ? openCommands() : write(data)));
-  $('keys').append(button);
+// The row of keys: the terminal's, or the program's.
+let keysFor = null;
+function renderKeys() {
+  const forApp = !!pane()?.app;
+  if (keysFor === forApp) return;
+  keysFor = forApp;
+  $('keys').replaceChildren();
+  for (const [label, data, kind] of forApp ? APP_KEYS : KEYS) {
+    const button = document.createElement('button');
+    button.textContent = label;
+    if (kind === 'wide' || kind === 'commands') button.className = 'wide';
+    keepFocus(button);
+    button.addEventListener('click', () => {
+      if (kind === 'commands') return openCommands();
+      if (!forApp) return write(data);
+      if (pane()?.app) send({ t: 'key', id: current, key: data });
+    });
+    $('keys').append(button);
+  }
 }
 keepFocus($('send'));
+
+// ---------- tapping and swiping a program's picture ----------
+// A tap clicks that spot on the PC; a swipe up or down scrolls it.
+
+let gesture = null;
+let scrollTimer = null;
+
+// Where on the picture, as fractions of its size.
+function spot(e) {
+  const r = shot.getBoundingClientRect();
+  return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+}
+
+shot.addEventListener('pointerdown', (e) => {
+  if (!pane()?.app) return;
+  gesture = { startX: e.clientX, startY: e.clientY, lastY: e.clientY, moved: false, at: spot(e), pending: 0 };
+  shot.setPointerCapture(e.pointerId);
+});
+
+shot.addEventListener('pointermove', (e) => {
+  if (!gesture) return;
+  if (!gesture.moved && Math.hypot(e.clientX - gesture.startX, e.clientY - gesture.startY) > 10) gesture.moved = true;
+  if (!gesture.moved) return;
+  gesture.pending += e.clientY - gesture.lastY;
+  gesture.lastY = e.clientY;
+  if (!scrollTimer) scrollTimer = setTimeout(flushScroll, 60);
+});
+
+// Finger up the screen scrolls down the page, as on a phone. The wheel counts
+// 120 for about 100 of the program's pixels.
+function flushScroll() {
+  scrollTimer = null;
+  const g = gesture || flushScroll.last;
+  if (!g || !g.pending || !pane()?.app) return;
+  const r = shot.getBoundingClientRect();
+  const pixels = g.pending * ((shot.naturalHeight || r.height) / r.height);
+  g.pending = 0;
+  send({ t: 'scroll', id: current, x: g.at.x, y: g.at.y, delta: Math.round(pixels * 1.2) });
+}
+
+function endGesture(e) {
+  if (!gesture) return;
+  const g = gesture;
+  gesture = null;
+  if (g.moved) {
+    flushScroll.last = g;
+    flushScroll();
+    return;
+  }
+  if (e.type !== 'pointerup') return;
+  const at = spot(e);
+  send({ t: 'tap', id: current, x: at.x, y: at.y });
+  const dot = document.createElement('div');
+  dot.className = 'tap-dot';
+  const view = $('view').getBoundingClientRect();
+  dot.style.left = `${e.clientX - view.left}px`;
+  dot.style.top = `${e.clientY - view.top}px`;
+  $('view').append(dot);
+  setTimeout(() => dot.remove(), 500);
+}
+shot.addEventListener('pointerup', endGesture);
+shot.addEventListener('pointercancel', endGesture);
 
 // ---------- the pane's own buttons ----------
 
@@ -381,7 +539,7 @@ $('restart').innerHTML = icon('restart');
 $('close').innerHTML = icon('close');
 $('model').addEventListener('change', () => send({ t: 'cmd', action: 'model', id: current, value: $('model').value }));
 $('effort').addEventListener('change', () => send({ t: 'cmd', action: 'effort', id: current, value: $('effort').value }));
-$('restart').addEventListener('click', () => send({ t: 'cmd', action: 'restart', id: current }));
+$('restart').addEventListener('click', () => send({ t: 'cmd', action: pane()?.app ? 'regrab' : 'restart', id: current }));
 $('fit').addEventListener('click', () => {
   fit = !fit;
   localStorage.setItem('novaFit', fit ? 'phone' : 'pc');

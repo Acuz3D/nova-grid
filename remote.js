@@ -1,5 +1,6 @@
 // Phone remote: a small web page for watching and typing into the terminals
-// from a phone, anywhere. Nova Grid serves it on this PC only (127.0.0.1) and
+// (and the ChatGPT / Obsidian / Edge panes, as live pictures) from a phone,
+// anywhere. Nova Grid serves it on this PC only (127.0.0.1) and
 // Cloudflare's free "quick tunnel" gives it a public https address. The page
 // itself holds nothing; the terminals only reach a phone that presents the
 // secret key from the QR code (kept after the # so it is never sent in a
@@ -11,12 +12,16 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { WebSocketServer } = require('ws');
 const QRCode = require('qrcode');
+const { nativeImage } = require('electron');
 
 const CLOUDFLARED_URL = 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe';
 const SNAPSHOT_TIMEOUT = 3000;
 const MAX_INPUT = 64 * 1024;
+const PICTURE_EVERY = 300; // ms between looks at a program pane a phone is watching
+const PICTURE_MAX_WIDTH = 1600;
+const PICTURE_WAIT = 5000; // a phone that hasn't said it showed the last picture gets the next anyway after this
 
-let opts; // { dataDir, ptys, send, loadConfig, saveConfig, keepAwake, version }
+let opts; // { dataDir, ptys, embed, showWindow, send, loadConfig, saveConfig, keepAwake, version }
 let server = null;
 let wss = null;
 let port = 0;
@@ -94,7 +99,7 @@ function serveFile(req, res) {
     res.writeHead(200, {
       'Content-Type': `${entry[1]}; charset=utf-8`,
       'Cache-Control': 'no-store',
-      'Content-Security-Policy': "default-src 'self'; connect-src 'self' wss: ws:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'",
+      'Content-Security-Policy': "default-src 'self'; connect-src 'self' wss: ws:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'",
       'Referrer-Policy': 'no-referrer',
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
@@ -127,7 +132,7 @@ function onConnection(ws, req) {
   const origin = req.headers.origin;
   if (origin && new URL(origin).host !== req.headers.host) return ws.close();
 
-  const client = { ws, authed: false, viewing: null, fit: true, cols: 0, rows: 0, buffer: null, alive: true };
+  const client = { ws, authed: false, viewing: null, fit: true, cols: 0, rows: 0, width: 0, height: 0, buffer: null, alive: true, picture: null };
   clients.add(client);
   ws.on('pong', () => (client.alive = true));
   ws.on('message', (raw) => {
@@ -167,9 +172,15 @@ function hello(client, msg) {
 }
 
 const terminal = (id) => paneState.panes.find((p) => p.id === id && !p.app);
+const program = (id) => paneState.panes.find((p) => p.id === id && p.app);
 
 function onMessage(client, msg) {
   if (msg.t === 'view') return view(client, msg);
+  if (msg.t === 'shown') {
+    if (client.picture) client.picture.waiting = 0;
+    return;
+  }
+  if (['tap', 'scroll', 'type', 'key'].includes(msg.t)) return programInput(client, msg);
   if (msg.t === 'input') {
     const data = String(msg.data || '').slice(0, MAX_INPUT);
     if (terminal(msg.id)) opts.ptys.get(msg.id)?.write(data);
@@ -186,7 +197,9 @@ function onMessage(client, msg) {
       return opts.send('remote:command', { action: 'add', cwd });
     }
     if (!paneState.panes.some((p) => p.id === msg.id)) return;
-    if (['restart', 'close'].includes(msg.action)) opts.send('remote:command', { action: msg.action, id: msg.id });
+    // a program pane hidden on the PC (Nova Grid minimised, another pane enlarged): show it
+    if (msg.action === 'reveal' && program(msg.id)) opts.showWindow();
+    if (['restart', 'close', 'reveal', 'regrab'].includes(msg.action)) opts.send('remote:command', { action: msg.action, id: msg.id });
     if (['model', 'effort'].includes(msg.action)) opts.send('remote:command', { action: msg.action, id: msg.id, value: String(msg.value || '') });
   }
 }
@@ -194,12 +207,20 @@ function onMessage(client, msg) {
 // The phone shows one terminal at a time. Its screen so far comes from the
 // window (exactly what the PC pane shows), then output streams live; anything
 // that arrives in between is held back so nothing is lost or doubled.
+// A program pane is shown as pictures instead (see further down).
 function view(client, msg) {
-  client.viewing = terminal(msg.id) ? msg.id : null;
+  client.viewing = paneState.panes.some((p) => p.id === msg.id) ? msg.id : null;
   client.fit = !!msg.fit;
   client.cols = Math.max(20, Math.min(300, Number(msg.cols) || 0));
   client.rows = Math.max(8, Math.min(200, Number(msg.rows) || 0));
+  client.width = Math.max(200, Math.min(2000, Number(msg.width) || 0));
+  client.height = Math.max(200, Math.min(2000, Number(msg.height) || 0));
+  client.picture = program(client.viewing) ? { state: null, hash: null, waiting: 0 } : null;
   updateSizes();
+  if (client.picture) {
+    client.buffer = null;
+    return setTimeout(sendPictures, 50);
+  }
   if (!client.viewing) return (client.buffer = null);
 
   client.buffer = [];
@@ -239,14 +260,91 @@ const ptyData = (id, data) => toViewers(id, { t: 'data', id, data });
 const ptyStarted = (id) => toViewers(id, { t: 'reset', id });
 
 // While a phone watches a terminal with "fit to phone" on, the terminal takes
-// the phone's size so Claude lays its screen out for it. The newest phone wins;
+// the phone's size so Claude lays its screen out for it. A program pane's
+// window shrinks to the phone's shape (in the phone's screen points), so
+// ChatGPT and the rest switch to their phone layout. The newest phone wins;
 // the PC pane gets its own size back when no phone is watching.
 function updateSizes() {
   const sizes = {};
   for (const client of clients) {
-    if (client.authed && client.viewing && client.fit) sizes[client.viewing] = { cols: client.cols, rows: client.rows };
+    if (!client.authed || !client.viewing || !client.fit) continue;
+    sizes[client.viewing] = client.picture ? { width: client.width, height: client.height } : { cols: client.cols, rows: client.rows };
   }
   opts.send('remote:sizes', sizes);
+}
+
+// ---------- program panes on the phone ----------
+// A few times a second, each program pane a phone watches is copied as a
+// picture. A phone gets a new one only when it changed and once the phone has
+// shown the last, so a slow connection gets fewer pictures, not a backlog.
+
+function takePicture(id) {
+  const shot = opts.embed.picture(id);
+  if (shot.state !== 'ok') return shot;
+  const hash = crypto.createHash('sha1').update(shot.pixels).digest('base64');
+  let jpeg = null;
+  return {
+    state: 'ok',
+    hash,
+    jpeg() {
+      if (jpeg) return jpeg;
+      let image = nativeImage.createFromBitmap(shot.pixels, { width: shot.width, height: shot.height });
+      if (shot.width > PICTURE_MAX_WIDTH) image = image.resize({ width: PICTURE_MAX_WIDTH, quality: 'good' });
+      return (jpeg = image.toJPEG(70));
+    },
+  };
+}
+
+function sendPictures() {
+  const shots = new Map(); // one picture per pane, however many phones watch it
+  for (const client of clients) {
+    const pic = client.picture;
+    if (!client.authed || !pic || !program(client.viewing)) continue;
+    if (pic.waiting && Date.now() - pic.waiting < PICTURE_WAIT) continue;
+    if (!shots.has(client.viewing)) {
+      try {
+        shots.set(client.viewing, takePicture(client.viewing));
+      } catch {
+        shots.set(client.viewing, { state: 'gone' });
+      }
+    }
+    const shot = shots.get(client.viewing);
+    if (shot.state !== 'ok') {
+      if (pic.state !== shot.state) sendTo(client, { t: 'picture', id: client.viewing, state: shot.state });
+      pic.state = shot.state;
+      pic.hash = null;
+      continue;
+    }
+    if (shot.hash === pic.hash) continue;
+    pic.state = 'ok';
+    pic.hash = shot.hash;
+    pic.waiting = Date.now();
+    // the picture itself follows as a binary message
+    sendTo(client, { t: 'picture', id: client.viewing, state: 'ok' });
+    if (client.ws.readyState === 1) client.ws.send(shot.jpeg());
+  }
+}
+setInterval(sendPictures, PICTURE_EVERY);
+
+let soonTimer;
+const picturesSoon = () => {
+  clearTimeout(soonTimer);
+  soonTimer = setTimeout(sendPictures, 120);
+};
+
+// Taps, scrolling and typing from the phone (x, y: fractions of the picture).
+function programInput(client, msg) {
+  const id = msg.id;
+  if (!program(id) || client.viewing !== id) return;
+  if (msg.t === 'tap') opts.embed.tap(id, msg.x, msg.y);
+  if (msg.t === 'type') opts.embed.type(id, String(msg.text || '').slice(0, MAX_INPUT));
+  if (msg.t === 'key') opts.embed.key(id, String(msg.key || ''));
+  if (msg.t === 'scroll' && !opts.embed.scroll(id, msg.x, msg.y, msg.delta)) {
+    // something covers Nova Grid on the PC, and the wheel only works where the PC can see it
+    opts.showWindow();
+    setTimeout(() => opts.embed.scroll(id, msg.x, msg.y, msg.delta), 150);
+  }
+  picturesSoon();
 }
 
 function setState(state) {
@@ -254,7 +352,10 @@ function setState(state) {
   for (const client of clients) {
     if (!client.authed) continue;
     sendTo(client, { t: 'state', ...paneState });
-    if (client.viewing && !terminal(client.viewing)) client.viewing = null;
+    if (client.viewing && !paneState.panes.some((p) => p.id === client.viewing)) {
+      client.viewing = null;
+      client.picture = null;
+    }
   }
 }
 

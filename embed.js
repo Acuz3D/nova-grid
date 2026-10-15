@@ -13,6 +13,7 @@ const { execFile, spawn } = require('child_process');
 
 const user32 = koffi.load('user32.dll');
 const kernel32 = koffi.load('kernel32.dll');
+const gdi32 = koffi.load('gdi32.dll');
 
 const RECT = koffi.struct('RECT', { left: 'int32', top: 'int32', right: 'int32', bottom: 'int32' });
 const POINT = koffi.struct('POINT', { x: 'int32', y: 'int32' });
@@ -23,6 +24,19 @@ const WINDOWPLACEMENT = koffi.struct('WINDOWPLACEMENT', {
   minPosition: POINT,
   maxPosition: POINT,
   normalPosition: RECT,
+});
+const BITMAPINFOHEADER = koffi.struct('BITMAPINFOHEADER', {
+  biSize: 'uint32',
+  biWidth: 'int32',
+  biHeight: 'int32',
+  biPlanes: 'uint16',
+  biBitCount: 'uint16',
+  biCompression: 'uint32',
+  biSizeImage: 'uint32',
+  biXPelsPerMeter: 'int32',
+  biYPelsPerMeter: 'int32',
+  biClrUsed: 'uint32',
+  biClrImportant: 'uint32',
 });
 const EnumProc = koffi.proto('bool __stdcall EnumWindowsProc(intptr_t hwnd, intptr_t lParam)');
 const w = {
@@ -45,6 +59,23 @@ const w = {
   ClientToScreen: user32.func('bool __stdcall ClientToScreen(intptr_t hwnd, _Inout_ POINT *pt)'),
   SetLayeredWindowAttributes: user32.func('bool __stdcall SetLayeredWindowAttributes(intptr_t hwnd, uint32 key, uint8 alpha, uint32 flags)'),
   PostMessageW: user32.func('bool __stdcall PostMessageW(intptr_t hwnd, uint32 msg, uintptr_t wParam, intptr_t lParam)'),
+  GetClientRect: user32.func('bool __stdcall GetClientRect(intptr_t hwnd, _Out_ RECT *rect)'),
+  ScreenToClient: user32.func('bool __stdcall ScreenToClient(intptr_t hwnd, _Inout_ POINT *pt)'),
+  WindowFromPoint: user32.func('intptr_t __stdcall WindowFromPoint(POINT pt)'),
+  IsChild: user32.func('bool __stdcall IsChild(intptr_t parent, intptr_t hwnd)'),
+  GetClassNameW: user32.func('int __stdcall GetClassNameW(intptr_t hwnd, uint8 *buf, int max)'),
+  GetCursorPos: user32.func('bool __stdcall GetCursorPos(_Out_ POINT *pt)'),
+  SetCursorPos: user32.func('bool __stdcall SetCursorPos(int x, int y)'),
+  MapVirtualKeyW: user32.func('uint32 __stdcall MapVirtualKeyW(uint32 code, uint32 type)'),
+  GetDC: user32.func('intptr_t __stdcall GetDC(intptr_t hwnd)'),
+  ReleaseDC: user32.func('int __stdcall ReleaseDC(intptr_t hwnd, intptr_t dc)'),
+  PrintWindow: user32.func('bool __stdcall PrintWindow(intptr_t hwnd, intptr_t dc, uint32 flags)'),
+  CreateCompatibleDC: gdi32.func('intptr_t __stdcall CreateCompatibleDC(intptr_t dc)'),
+  CreateCompatibleBitmap: gdi32.func('intptr_t __stdcall CreateCompatibleBitmap(intptr_t dc, int width, int height)'),
+  SelectObject: gdi32.func('intptr_t __stdcall SelectObject(intptr_t dc, intptr_t obj)'),
+  GetDIBits: gdi32.func('int __stdcall GetDIBits(intptr_t dc, intptr_t bmp, uint32 start, uint32 lines, _Out_ uint8 *bits, BITMAPINFOHEADER *info, uint32 usage)'),
+  DeleteObject: gdi32.func('bool __stdcall DeleteObject(intptr_t obj)'),
+  DeleteDC: gdi32.func('bool __stdcall DeleteDC(intptr_t dc)'),
   OpenProcess: kernel32.func('intptr_t __stdcall OpenProcess(uint32 access, bool inherit, uint32 pid)'),
   QueryFullProcessImageNameW: kernel32.func('bool __stdcall QueryFullProcessImageNameW(intptr_t proc, uint32 flags, uint8 *buf, _Inout_ uint32 *size)'),
   CloseHandle: kernel32.func('bool __stdcall CloseHandle(intptr_t h)'),
@@ -54,6 +85,8 @@ const GWL_STYLE = -16;
 const GWL_EXSTYLE = -20;
 const GWLP_HWNDPARENT = -8; // on a top-level window: its owner
 const GW_OWNER = 4;
+const GW_HWNDNEXT = 2;
+const GW_CHILD = 5;
 const WS_CHILD = 0x40000000;
 const WS_POPUP = 0x80000000 | 0;
 const WS_FRAME = 0x00c00000 | 0x00040000 | 0x00080000 | 0x00020000 | 0x00010000; // caption, sizing border, system menu, min/max
@@ -72,6 +105,15 @@ const SW_SHOWNA = 8;
 const SW_RESTORE = 9;
 const SW_SHOW = 5;
 const WM_CLOSE = 0x0010;
+const WM_KEYDOWN = 0x0100;
+const WM_KEYUP = 0x0101;
+const WM_CHAR = 0x0102;
+const WM_MOUSEMOVE = 0x0200;
+const WM_LBUTTONDOWN = 0x0201;
+const WM_LBUTTONUP = 0x0202;
+const WM_MOUSEWHEEL = 0x020a;
+const MK_LBUTTON = 0x1;
+const PW_RENDERFULLCONTENT = 0x2;
 
 // exe: the program's file name. startName: its name in the Start menu, used to launch it.
 // ChatGPT and Obsidian have a single main window, so opening them again never
@@ -330,4 +372,160 @@ function check() {
   return { gone, titles };
 }
 
-module.exports = { APPS, attach, place, follow, opacity, focus, release, close, releaseAll, check };
+// ---------- the phone remote ----------
+// A phone can watch a program's pane as a picture and tap, scroll and type
+// into it. The picture comes from the program itself, so it still works with
+// other windows on top, but not while Nova Grid is minimised or the pane is
+// hidden: the program draws nothing then. Taps and typing go straight to the
+// program's window, so the PC's own mouse and keyboard are left alone
+// (except for scrolling, see scroll()).
+
+function className(hwnd) {
+  const buf = Buffer.alloc(512);
+  const n = w.GetClassNameW(hwnd, buf, 256);
+  return buf.toString('utf16le', 0, n * 2);
+}
+
+// The picture as raw pixels (blue, green, red, alpha), or why there isn't one.
+function picture(id) {
+  const e = embedded.get(id);
+  if (!e || !w.IsWindow(e.hwnd)) return { state: 'gone' };
+  if (w.IsIconic(e.parent)) return { state: 'minimised' };
+  if (!e.shown) return { state: 'hidden' };
+  const r = {};
+  w.GetClientRect(e.hwnd, r);
+  const width = r.right;
+  const height = r.bottom;
+  if (width < 10 || height < 10) return { state: 'hidden' };
+
+  const screen = w.GetDC(0);
+  const dc = w.CreateCompatibleDC(screen);
+  const bmp = w.CreateCompatibleBitmap(screen, width, height);
+  const old = w.SelectObject(dc, bmp);
+  // "full content" asks for what the program draws with the graphics card too
+  w.PrintWindow(e.hwnd, dc, PW_RENDERFULLCONTENT);
+  w.SelectObject(dc, old);
+  const pixels = Buffer.alloc(width * height * 4);
+  // a negative height gives the top row first
+  const info = { biSize: koffi.sizeof(BITMAPINFOHEADER), biWidth: width, biHeight: -height, biPlanes: 1, biBitCount: 32 };
+  w.GetDIBits(dc, bmp, 0, height, pixels, info, 0);
+  w.DeleteObject(bmp);
+  w.DeleteDC(dc);
+  w.ReleaseDC(0, screen);
+  for (let i = 3; i < pixels.length; i += 4) pixels[i] = 255; // the copy leaves the alpha unset
+  return { state: 'ok', width, height, pixels };
+}
+
+const lparam = (x, y) => ((y & 0xffff) << 16) | (x & 0xffff);
+
+// The innermost window at a spot in the pane (fx, fy: fractions of its size).
+// These programs take the mouse in a child window over the page; their
+// "Intermediate D3D Window" is only for drawing, so it's passed over.
+function windowAt(e, fx, fy) {
+  const r = {};
+  w.GetClientRect(e.hwnd, r);
+  const clamp = (f) => Math.min(Math.max(Number(f) || 0, 0), 1);
+  const screen = { x: Math.round(clamp(fx) * (r.right - 1)), y: Math.round(clamp(fy) * (r.bottom - 1)) };
+  w.ClientToScreen(e.hwnd, screen);
+  let hwnd = e.hwnd;
+  for (let depth = 0; depth < 8; depth++) {
+    let inner = 0;
+    for (let c = w.GetWindow(hwnd, GW_CHILD); c; c = w.GetWindow(c, GW_HWNDNEXT)) {
+      if (!w.IsWindowVisible(c) || className(c) === 'Intermediate D3D Window') continue;
+      const cr = rectOf(c);
+      if (screen.x >= cr.left && screen.x < cr.right && screen.y >= cr.top && screen.y < cr.bottom) {
+        inner = c;
+        break;
+      }
+    }
+    if (!inner) break;
+    hwnd = inner;
+  }
+  const local = { ...screen };
+  w.ScreenToClient(hwnd, local);
+  return { hwnd, x: local.x, y: local.y, screen };
+}
+
+const belongs = (e, hwnd) => hwnd === e.hwnd || w.IsChild(e.hwnd, hwnd);
+
+function tap(id, fx, fy) {
+  const e = embedded.get(id);
+  if (!e || !w.IsWindow(e.hwnd)) return;
+  const at = windowAt(e, fx, fy);
+  e.typeInto = at.hwnd; // typing goes where the last tap went
+  const lp = lparam(at.x, at.y);
+  w.PostMessageW(at.hwnd, WM_MOUSEMOVE, 0, lp);
+  w.PostMessageW(at.hwnd, WM_LBUTTONDOWN, MK_LBUTTON, lp);
+  setTimeout(() => w.IsWindow(at.hwnd) && w.PostMessageW(at.hwnd, WM_LBUTTONUP, 0, lp), 30);
+}
+
+// These programs only take the mouse wheel where the PC's pointer really is,
+// so the pointer is moved over the spot while scrolling and put back a moment
+// later. Returns false if something covers the spot on the PC's screen.
+let pointerWas = null;
+let pointerTimer;
+function scroll(id, fx, fy, delta) {
+  const e = embedded.get(id);
+  if (!e || !w.IsWindow(e.hwnd)) return true;
+  const at = windowAt(e, fx, fy);
+  if (!belongs(e, w.WindowFromPoint(at.screen))) return false;
+  if (!pointerWas) {
+    pointerWas = {};
+    w.GetCursorPos(pointerWas);
+  }
+  w.SetCursorPos(at.screen.x, at.screen.y);
+  const amount = Math.max(-1200, Math.min(1200, Math.round(Number(delta) || 0)));
+  w.PostMessageW(at.hwnd, WM_MOUSEWHEEL, ((amount & 0xffff) << 16) >>> 0, lparam(at.screen.x, at.screen.y));
+  clearTimeout(pointerTimer);
+  pointerTimer = setTimeout(() => {
+    w.SetCursorPos(pointerWas.x, pointerWas.y);
+    pointerWas = null;
+  }, 400);
+  return true;
+}
+
+function typeTarget(e) {
+  if (e.typeInto && w.IsWindow(e.typeInto) && belongs(e, e.typeInto)) return e.typeInto;
+  return windowAt(e, 0.5, 0.5).hwnd;
+}
+
+// Text as typed characters. New lines become spaces, as Enter would send a
+// half-written ChatGPT message.
+function type(id, text) {
+  const e = embedded.get(id);
+  if (!e || !w.IsWindow(e.hwnd)) return;
+  const hwnd = typeTarget(e);
+  const clean = String(text).replace(/\r?\n/g, ' ');
+  for (let i = 0; i < clean.length; i++) w.PostMessageW(hwnd, WM_CHAR, clean.charCodeAt(i), 1);
+}
+
+// name -> [virtual key, also types a character (as the real key does), on the keyboard's extended part]
+const KEYS = {
+  Enter: [0x0d, true],
+  Backspace: [0x08, true],
+  Tab: [0x09, true],
+  Escape: [0x1b, true],
+  PageUp: [0x21, false, true],
+  PageDown: [0x22, false, true],
+  End: [0x23, false, true],
+  Home: [0x24, false, true],
+  ArrowLeft: [0x25, false, true],
+  ArrowUp: [0x26, false, true],
+  ArrowRight: [0x27, false, true],
+  ArrowDown: [0x28, false, true],
+  Delete: [0x2e, false, true],
+};
+
+function key(id, name) {
+  const e = embedded.get(id);
+  const k = KEYS[name];
+  if (!e || !k || !w.IsWindow(e.hwnd)) return;
+  const [vk, char, extended] = k;
+  const hwnd = typeTarget(e);
+  const lp = 1 | (w.MapVirtualKeyW(vk, 0) << 16) | (extended ? 1 << 24 : 0);
+  w.PostMessageW(hwnd, WM_KEYDOWN, vk, lp);
+  if (char) w.PostMessageW(hwnd, WM_CHAR, vk, lp);
+  w.PostMessageW(hwnd, WM_KEYUP, vk, lp | 0xc0000000);
+}
+
+module.exports = { APPS, attach, place, follow, opacity, focus, release, close, releaseAll, check, picture, tap, scroll, type, key };
