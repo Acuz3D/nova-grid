@@ -2,6 +2,8 @@
 
 A Windows app that runs several Claude Code terminals side by side in one window, each in its own folder.
 
+**[⬇ Download the latest version](https://github.com/Acuz3D/nova-grid/releases/latest)**
+
 - Pick a model and effort level per terminal
 - Usage bars for the session, weekly and Fable limits
 - MCP servers shown per folder
